@@ -10,7 +10,7 @@ router = APIRouter(prefix="/api/admin/groups", tags=["组别管理"])
 
 
 class GroupCreate(BaseModel):
-    contest_id: int
+    contest_id: int | None = None
     name: str = Field(min_length=1, max_length=100)
     description: str = ""
     max_participants: int = 0

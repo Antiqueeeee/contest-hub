@@ -3,32 +3,24 @@ import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 
-interface Group { id: number; contest_id: number; name: string; description: string; max_participants: number; sort_order: number }
-interface Contest { id: number; title: string }
+interface Group { id: number; name: string; description: string; max_participants: number; sort_order: number }
 
 export default function GroupManagementPage() {
   const [groups, setGroups] = useState<Group[]>([])
-  const [contests, setContests] = useState<Contest[]>([])
-  const [contestFilter, setContestFilter] = useState('all')
   const [loading, setLoading] = useState(true)
   const [dialog, setDialog] = useState(false)
   const [edit, setEdit] = useState<Partial<Group> | null>(null)
 
   const fetchGroups = useCallback(async () => {
     try {
-      const params = contestFilter !== 'all' ? `?contest_id=${contestFilter}` : ''
-      const [gRes, cRes] = await Promise.all([
-        api.get<{ items: Group[] }>(`/admin/groups${params}`),
-        api.get<{ items: Contest[] }>('/admin/contests'),
-      ])
-      setGroups(gRes.items); setContests(cRes.items)
-    } catch (e) { console.error(e) } finally { setLoading(false) }
-  }, [contestFilter])
+      const res = await api.get<{ items: Group[] }>('/admin/groups')
+      setGroups(res.items)
+    } finally { setLoading(false) }
+  }, [])
 
   useEffect(() => { fetchGroups() }, [fetchGroups])
 
@@ -52,40 +44,32 @@ export default function GroupManagementPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">组别管理</h1>
-        <Button onClick={() => { setEdit({ contest_id: 0, name: '', description: '', max_participants: 0, sort_order: 0 }); setDialog(true) }}>
+        <div>
+          <h1 className="text-2xl font-bold">组别管理</h1>
+          <p className="text-muted-foreground text-sm mt-1">管理全局参赛组别，创建赛事时可直接选用</p>
+        </div>
+        <Button onClick={() => { setEdit({ name: '', description: '', max_participants: 0, sort_order: groups.length + 1 }); setDialog(true) }}>
           <Plus className="h-4 w-4 mr-1" />添加组别
         </Button>
       </div>
-      <Select value={contestFilter} onValueChange={(v) => setContestFilter(v ?? 'all')}>
-        <SelectTrigger className="w-64"><SelectValue placeholder="按赛事筛选" /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">全部赛事</SelectItem>
-          {contests.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.title}</SelectItem>)}
-        </SelectContent>
-      </Select>
       <Table>
         <TableHeader><TableRow>
-          <TableHead>赛事</TableHead><TableHead>组别名称</TableHead><TableHead>说明</TableHead>
-          <TableHead>人数上限</TableHead><TableHead>排序</TableHead><TableHead className="text-right">操作</TableHead>
+          <TableHead>排序</TableHead><TableHead>组别名称</TableHead><TableHead>说明</TableHead>
+          <TableHead>人数上限</TableHead><TableHead className="text-right">操作</TableHead>
         </TableRow></TableHeader>
         <TableBody>
-          {groups.map(g => {
-            const ct = contests.find(c => c.id === g.contest_id)
-            return (
-              <TableRow key={g.id}>
-                <TableCell className="text-sm max-w-[200px] truncate">{ct?.title || `赛事 #${g.contest_id}`}</TableCell>
-                <TableCell className="font-medium">{g.name}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{g.description || '-'}</TableCell>
-                <TableCell>{g.max_participants || '不限'}</TableCell>
-                <TableCell>{g.sort_order}</TableCell>
-                <TableCell className="text-right space-x-1">
-                  <Button variant="ghost" size="sm" onClick={() => { setEdit({ ...g }); setDialog(true) }}><Pencil className="h-3 w-3" /></Button>
-                  <Button variant="ghost" size="sm" onClick={() => handleDelete(g)}><Trash2 className="h-3 w-3 text-destructive" /></Button>
-                </TableCell>
-              </TableRow>
-            )
-          })}
+          {groups.map(g => (
+            <TableRow key={g.id}>
+              <TableCell className="w-20">{g.sort_order}</TableCell>
+              <TableCell className="font-medium">{g.name}</TableCell>
+              <TableCell className="text-sm text-muted-foreground">{g.description || '-'}</TableCell>
+              <TableCell>{g.max_participants || '不限'}</TableCell>
+              <TableCell className="text-right space-x-1">
+                <Button variant="ghost" size="sm" onClick={() => { setEdit({ ...g }); setDialog(true) }}><Pencil className="h-3 w-3" /></Button>
+                <Button variant="ghost" size="sm" onClick={() => handleDelete(g)}><Trash2 className="h-3 w-3 text-destructive" /></Button>
+              </TableCell>
+            </TableRow>
+          ))}
         </TableBody>
       </Table>
 
@@ -93,16 +77,10 @@ export default function GroupManagementPage() {
         <DialogContent>
           <DialogHeader><DialogTitle>{edit?.id ? '编辑组别' : '添加组别'}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div className="space-y-1"><Label>所属赛事</Label>
-              <Select value={String(edit?.contest_id || '')} onValueChange={(v) => setEdit(p => p ? { ...p, contest_id: Number(v) } : null)}>
-                <SelectTrigger><SelectValue placeholder="选择赛事" /></SelectTrigger>
-                <SelectContent>{contests.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.title}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1"><Label>组别名称</Label><Input value={edit?.name || ''} onChange={e => setEdit(p => p ? { ...p, name: e.target.value } : null)} /></div>
-            <div className="space-y-1"><Label>说明</Label><Input value={edit?.description || ''} onChange={e => setEdit(p => p ? { ...p, description: e.target.value } : null)} /></div>
+            <div className="space-y-1"><Label>组别名称</Label><Input value={edit?.name || ''} onChange={e => setEdit(p => p ? { ...p, name: e.target.value } : null)} placeholder="如：小学组、初中组、高中组、大学组" /></div>
+            <div className="space-y-1"><Label>说明</Label><Input value={edit?.description || ''} onChange={e => setEdit(p => p ? { ...p, description: e.target.value } : null)} placeholder="如：1-6年级在校学生" /></div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label>人数上限</Label><Input type="number" value={edit?.max_participants || 0} onChange={e => setEdit(p => p ? { ...p, max_participants: Number(e.target.value) } : null)} /></div>
+              <div className="space-y-1"><Label>人数上限（0=不限）</Label><Input type="number" value={edit?.max_participants || 0} onChange={e => setEdit(p => p ? { ...p, max_participants: Number(e.target.value) } : null)} /></div>
               <div className="space-y-1"><Label>排序</Label><Input type="number" value={edit?.sort_order || 0} onChange={e => setEdit(p => p ? { ...p, sort_order: Number(e.target.value) } : null)} /></div>
             </div>
           </div>
