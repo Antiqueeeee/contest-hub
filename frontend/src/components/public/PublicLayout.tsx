@@ -2,7 +2,6 @@ import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import { Trophy, User, LogOut, Menu, X } from 'lucide-react'
 import { useContestantAuth } from '@/hooks/useContestantAuth'
 import { Button } from '@/components/ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useState } from 'react'
 
 const navItems = [
@@ -23,6 +22,10 @@ export function PublicLayout() {
 
   const handleLogout = () => { logout(); navigate('/') }
 
+  const displayNav = isLoggedIn
+    ? [...navItems.slice(0, 5), { to: '/me', label: '个人中心' }, ...navItems.slice(5)]
+    : navItems
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <header className="sticky top-0 z-50 bg-card/90 backdrop-blur-sm border-b">
@@ -36,7 +39,7 @@ export function PublicLayout() {
 
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-0.5">
-            {navItems.map(item => (
+            {displayNav.map(item => (
               <Link
                 key={item.to}
                 to={item.to}
@@ -53,26 +56,21 @@ export function PublicLayout() {
 
           <div className="flex items-center gap-2">
             {isLoggedIn ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger>
-                    <span className="inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-accent transition-colors cursor-pointer">
-                      <User className="h-4 w-4" />
-                      <span className="hidden sm:inline">{user?.name}</span>
-                    </span>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-40">
-                    <DropdownMenuItem onClick={() => navigate('/me')}><User className="h-4 w-4 mr-2" />个人中心</DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout}><LogOut className="h-4 w-4 mr-2" />退出登录</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : (
-                <Button variant="ghost" size="sm" onClick={() => navigate('/login')} className="gap-2">
+              <>
+                <Link to="/me" className="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
                   <User className="h-4 w-4" />
-                  <span className="hidden sm:inline">登录 / 注册</span>
-                </Button>
-              )
-            }
+                  <span>{user?.name}</span>
+                </Link>
+                <button onClick={handleLogout} className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors" title="退出登录">
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </>
+            ) : (
+              <Button variant="ghost" size="sm" onClick={() => navigate('/login')} className="gap-2">
+                <User className="h-4 w-4" />
+                <span className="hidden sm:inline">登录 / 注册</span>
+              </Button>
+            )}
             <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileOpen(!mobileOpen)}>
               {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
@@ -82,7 +80,7 @@ export function PublicLayout() {
         {/* Mobile nav */}
         {mobileOpen && (
           <div className="md:hidden border-t bg-card px-4 py-3 space-y-1">
-            {navItems.map(item => (
+            {displayNav.map(item => (
               <Link
                 key={item.to}
                 to={item.to}
