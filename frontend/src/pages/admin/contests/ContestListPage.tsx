@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Plus, Search } from 'lucide-react'
+import { useCallback } from 'react'
 
 interface ContestItem {
   id: number; title: string; status: string; max_participants: number
@@ -40,6 +41,13 @@ export default function ContestListPage() {
   }, [keyword, statusTab])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  const handleStatusChange = useCallback(async (contestId: number, newStatus: string) => {
+    const labels: Record<string, string> = { open: '确认发布该赛事？发布后选手即可报名', ongoing: '确认关闭报名？', finished: '确认结束该比赛？', cancelled: '确认取消该赛事？此操作不可恢复' }
+    if (!confirm(labels[newStatus] || `确认将状态改为 ${newStatus}？`)) return
+    await api.patch(`/admin/contests/${contestId}/status?status=${newStatus}`)
+    fetchData()
+  }, [fetchData])
 
   if (loading) return <div className="text-center py-12 text-muted-foreground">加载中...</div>
 
@@ -83,7 +91,11 @@ export default function ContestListPage() {
                 <TableCell className="text-sm text-muted-foreground">{c.created_at?.split('T')[0]}</TableCell>
                 <TableCell className="text-right space-x-1">
                   <Link to={`/admin/contests/${c.id}`}><Button variant="ghost" size="sm">编辑</Button></Link>
-                  <Link to={`/admin/registrations?contestId=${c.id}`}><Button variant="ghost" size="sm">报名</Button></Link>
+                  {c.status === 'draft' && <Button variant="ghost" size="sm" onClick={() => handleStatusChange(c.id, 'open')} className="text-green-600">发布</Button>}
+                  {c.status === 'open' && <Button variant="ghost" size="sm" onClick={() => handleStatusChange(c.id, 'ongoing')}>截止报名</Button>}
+                  {c.status === 'ongoing' && <Button variant="ghost" size="sm" onClick={() => handleStatusChange(c.id, 'finished')}>结束比赛</Button>}
+                  {c.status === 'open' && <Button variant="ghost" size="sm" onClick={() => handleStatusChange(c.id, 'cancelled')} className="text-destructive">取消</Button>}
+                  {(c.status === 'open' || c.status === 'ongoing') && <Link to={`/admin/registrations?contestId=${c.id}`}><Button variant="ghost" size="sm">报名</Button></Link>}
                   {c.status === 'finished' && <Link to={`/admin/results?contestId=${c.id}`}><Button variant="ghost" size="sm">成绩</Button></Link>}
                 </TableCell>
               </TableRow>
