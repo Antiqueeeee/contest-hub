@@ -98,12 +98,14 @@ export default function ContestantCenterPage() {
                 <Card className="border-0 shadow-sm">
                   <Table>
                     <TableHeader><TableRow>
+                      <TableHead className="w-12">#</TableHead>
                       <TableHead>赛事</TableHead><TableHead>状态</TableHead><TableHead>报名编号</TableHead>
                       <TableHead>报名时间</TableHead><TableHead>成绩</TableHead>
                     </TableRow></TableHeader>
                     <TableBody>
-                      {records.map((r: any) => (
+                      {records.map((r: any, idx: number) => (
                         <TableRow key={r.id}>
+                          <TableCell className="text-muted-foreground text-sm">{idx + 1}</TableCell>
                           <TableCell className="text-sm font-medium max-w-[200px] truncate">
                             <Link to={`/contests/${r.contest_id}`} className="hover:text-primary">{r.contest_title || '-'}</Link>
                           </TableCell>
