@@ -843,7 +843,7 @@ erDiagram
 
 | 需求 | 说明 |
 |------|------|
-| **API 文档** | FastAPI 自动生成 OpenAPI（Swagger）文档，`/api/docs` 可访问 |
+| **API 文档** | FastAPI OpenAPI 文档开发环境可访问 `/api/docs`，生产环境关闭（`docs_url=None`） |
 | **数据库迁移** | 使用 Alembic 管理所有数据库 Schema 变更，迁移脚本纳入版本控制 |
 | **代码规范** | Python 后端使用 ruff/black 格式化；前端使用 ESLint + Prettier |
 | **README** | 项目根目录 README 包含：项目简介、技术栈、本地启动步骤、目录结构说明 |
