@@ -38,8 +38,8 @@ export default function ResultListPage() {
     const load = async () => {
       try {
         const [regRes, resRes] = await Promise.all([
-          api.get<{ items: RegItem[] }>(`/admin/registrations?contest_id=${contestId}&page_size=200`),
-          api.get<{ items: ResultItem[] }>(`/admin/results?contest_id=${contestId}&page_size=200`),
+          api.get<{ items: RegItem[] }>(`/admin/registrations?contest_id=${contestId}&page_size=100`),
+          api.get<{ items: ResultItem[] }>(`/admin/results?contest_id=${contestId}&page_size=100`),
         ])
         setRegistrations(Array.isArray(regRes.items) ? regRes.items : [])
         setResults(Array.isArray(resRes.items) ? resRes.items : [])
@@ -72,7 +72,7 @@ export default function ResultListPage() {
         total_score: total,
       })
       // Refresh results
-      const res = await api.get<{ items: ResultItem[] }>(`/admin/results?contest_id=${contestId}&page_size=200`)
+      const res = await api.get<{ items: ResultItem[] }>(`/admin/results?contest_id=${contestId}&page_size=100`)
       setResults(res.items || [])
       setEditReg(null)
     } catch (e) { alert('保存失败') }
@@ -86,14 +86,14 @@ export default function ResultListPage() {
         await api.patch(`/admin/results/${r.id}/publish`).catch(() => {})
       }
     }
-    const res = await api.get<{ items: ResultItem[] }>(`/admin/results?contest_id=${contestId}&page_size=200`)
+    const res = await api.get<{ items: ResultItem[] }>(`/admin/results?contest_id=${contestId}&page_size=100`)
     setResults(res.items || [])
   }
 
   const handleWithdraw = async (id: number) => {
     if (!confirm('确认撤回？')) return
     await api.patch(`/admin/results/${id}/withdraw`)
-    const res = await api.get<{ items: ResultItem[] }>(`/admin/results?contest_id=${contestId}&page_size=200`)
+    const res = await api.get<{ items: ResultItem[] }>(`/admin/results?contest_id=${contestId}&page_size=100`)
     setResults(res.items || [])
   }
 
@@ -115,7 +115,7 @@ export default function ResultListPage() {
       const data = await res.json()
       alert(`导入完成：成功 ${data.success_count} 条，失败 ${data.error_count} 条`)
       // Refresh
-      const r = await api.get<{ items: ResultItem[] }>(`/admin/results?contest_id=${contestId}&page_size=200`)
+      const r = await api.get<{ items: ResultItem[] }>(`/admin/results?contest_id=${contestId}&page_size=100`)
       setResults(r.items || [])
     }
     input.click()
