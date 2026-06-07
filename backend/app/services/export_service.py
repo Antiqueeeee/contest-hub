@@ -10,6 +10,20 @@ from app.config import get_settings
 from app.services.registration_service import get_registrations_for_export
 from app.services.result_service import list_results
 
+# Chinese field name mapping
+FIELD_LABELS = {
+    "registration_number": "报名编号",
+    "name": "姓名",
+    "phone": "手机号",
+    "group_id": "组别",
+    "group": "组别",
+    "submitted_at": "报名时间",
+    "total_score": "总分",
+    "rank": "排名",
+    "award": "奖项",
+    "scores": "评分详情",
+}
+
 # In-memory export task store
 _export_tasks: dict[str, dict] = {}
 
@@ -43,7 +57,8 @@ async def submit_export_task(
 
             # Header
             for col, name in enumerate(field_names, 1):
-                cell = ws.cell(row=1, column=col, value=name)
+                label = FIELD_LABELS.get(name, name)
+                cell = ws.cell(row=1, column=col, value=label)
                 cell.font = header_font
                 cell.fill = header_fill
                 cell.alignment = center_align
@@ -74,7 +89,8 @@ async def submit_export_task(
                 field_names = ["registration_number", "name", "phone", "group", "total_score", "rank", "award"]
 
             for col, name in enumerate(field_names, 1):
-                cell = ws.cell(row=1, column=col, value=name)
+                label = FIELD_LABELS.get(name, name)
+                cell = ws.cell(row=1, column=col, value=label)
                 cell.font = header_font
                 cell.fill = header_fill
                 cell.alignment = center_align
