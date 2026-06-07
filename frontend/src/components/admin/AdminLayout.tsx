@@ -2,7 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import {
   LayoutDashboard, Newspaper, Flag, ClipboardList, BarChart3, FileSpreadsheet,
-  Users, LogOut, ChevronDown, ChevronRight, Trophy,
+  Users, LogOut, ChevronDown, ChevronRight, Trophy, FileText,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -28,6 +28,7 @@ const sidebarNavItems = [
   { to: '/admin/registrations', icon: ClipboardList, label: '报名管理' },
   { to: '/admin/results', icon: BarChart3, label: '成绩管理' },
   { to: '/admin/export', icon: FileSpreadsheet, label: '数据导出' },
+  { to: '/admin/site-content', icon: FileText, label: '站点内容' },
   { to: '/admin/users', icon: Users, label: '管理员管理' },
 ]
 
