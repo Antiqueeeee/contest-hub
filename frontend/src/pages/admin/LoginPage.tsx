@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [username, setUsername] = useState('admin')
   const [password, setPassword] = useState('123456')
   const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   const { login, isLoggedIn } = useAuth()
   const navigate = useNavigate()
 
@@ -21,11 +22,18 @@ export default function LoginPage() {
     return null
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const result = login(username, password)
-    if (result.ok) navigate('/admin')
-    else setError(result.error ?? '登录失败')
+    setSubmitting(true)
+    setError('')
+    try {
+      await login(username, password)
+      navigate('/admin')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '登录失败')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -56,7 +64,9 @@ export default function LoginPage() {
               <Input id="password" type="password" value={password} onChange={e => { setPassword(e.target.value); setError('') }} placeholder="请输入密码" className="h-10" />
             </div>
             {error && <p className="text-sm text-destructive bg-destructive/10 p-2.5 rounded-lg">{error}</p>}
-            <Button type="submit" className="w-full h-10" style={bgGradient}>登录</Button>
+            <Button type="submit" className="w-full h-10" style={bgGradient} disabled={submitting}>
+              {submitting ? '登录中...' : '登录'}
+            </Button>
             <p className="text-xs text-muted-foreground text-center">演示账号: admin / 任意密码</p>
           </form>
         </CardContent>

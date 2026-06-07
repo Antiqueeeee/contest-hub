@@ -1,33 +1,39 @@
-import { useState, useCallback } from 'react'
-import type { User } from '@/mock/types'
-import { users } from '@/mock/data'
+import { useState, useEffect, useCallback } from 'react'
+import { api, setToken, clearToken } from '@/api/client'
 
-const AUTH_KEY = 'contest_hub_auth'
+interface User {
+  id: number
+  username: string
+  name: string
+  phone: string
+  status: string
+}
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(() => {
-    try {
-      const stored = sessionStorage.getItem(AUTH_KEY)
-      return stored ? (JSON.parse(stored) as User) : null
-    } catch {
-      return null
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  // Check stored session on mount
+  useEffect(() => {
+    const stored = sessionStorage.getItem('contest_hub_user')
+    if (stored) {
+      try { setUser(JSON.parse(stored)) } catch { /**/ }
     }
-  })
-
-  function login(username: string, password: string): { ok: boolean; error?: string } {
-    const found = users.find(u => u.username === username)
-    if (!found) return { ok: false, error: '用户名不存在' }
-    if (found.status === 'disabled') return { ok: false, error: '账号已被禁用' }
-    if (!password) return { ok: false, error: '请输入密码' }
-    setUser(found)
-    sessionStorage.setItem(AUTH_KEY, JSON.stringify(found))
-    return { ok: true }
-  }
-
-  const logout = useCallback(() => {
-    setUser(null)
-    sessionStorage.removeItem(AUTH_KEY)
+    setLoading(false)
   }, [])
 
-  return { user, login, logout, isLoggedIn: !!user }
+  const login = useCallback(async (username: string, password: string) => {
+    const res = await api.post<{ access_token: string; user: User }>('/auth/login', { username, password })
+    setToken(res.access_token)
+    setUser(res.user)
+    sessionStorage.setItem('contest_hub_user', JSON.stringify(res.user))
+  }, [])
+
+  const logout = useCallback(() => {
+    clearToken()
+    setUser(null)
+    sessionStorage.removeItem('contest_hub_user')
+  }, [])
+
+  return { user, login, logout, isLoggedIn: !!user, loading }
 }
