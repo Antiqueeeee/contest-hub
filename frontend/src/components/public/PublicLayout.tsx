@@ -1,15 +1,25 @@
-import { Outlet, Link, useNavigate } from 'react-router-dom'
-import { Trophy, User, LogOut, Newspaper, Flag } from 'lucide-react'
+import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
+import { Trophy, User, LogOut, Menu, X } from 'lucide-react'
 import { useContestantAuth } from '@/hooks/useContestantAuth'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuSeparator, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { useState } from 'react'
+
+const navItems = [
+  { to: '/', label: '首页' },
+  { to: '/about', label: '平台介绍' },
+  { to: '/contests', label: '竞赛列表' },
+  { to: '/news', label: '通知公告' },
+  { to: '/results', label: '成绩查询' },
+  { to: '/faq', label: '常见问题' },
+  { to: '/contact', label: '联系我们' },
+]
 
 export function PublicLayout() {
   const { user, isLoggedIn, logout, loading } = useContestantAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const [mobileOpen, setMobileOpen] = useState(false)
 
   const handleLogout = () => { logout(); navigate('/') }
 
@@ -24,14 +34,21 @@ export function PublicLayout() {
             <span className="hidden sm:inline">竞赛信息发布平台</span>
           </Link>
 
-          <nav className="flex items-center gap-1 text-sm">
-            <Link to="/" className="px-3 py-2 rounded-md hover:bg-muted transition-colors font-medium">首页</Link>
-            <a href="/#news" className="px-3 py-2 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground flex items-center gap-1.5 no-underline">
-              <Newspaper className="h-3.5 w-3.5" />新闻
-            </a>
-            <a href="/#contests" className="px-3 py-2 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground flex items-center gap-1.5 no-underline">
-              <Flag className="h-3.5 w-3.5" />赛事
-            </a>
+          {/* Desktop nav */}
+          <nav className="hidden md:flex items-center gap-0.5">
+            {navItems.map(item => (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={`px-3 py-2 rounded-md text-sm transition-colors ${
+                  location.pathname === item.to
+                    ? 'bg-primary/10 text-primary font-medium'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                }`}
+              >
+                {item.label}
+              </Link>
+            ))}
           </nav>
 
           <div className="flex items-center gap-2">
@@ -41,28 +58,45 @@ export function PublicLayout() {
                   <DropdownMenuTrigger>
                     <Button variant="ghost" size="sm" className="gap-2" type="button">
                       <User className="h-4 w-4" />
-                      <span>{user?.name}</span>
+                      <span className="hidden sm:inline">{user?.name}</span>
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-40">
-                    <DropdownMenuItem onClick={() => navigate('/me')}>
-                      <User className="h-4 w-4 mr-2" />个人中心
-                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/me')}><User className="h-4 w-4 mr-2" />个人中心</DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout}>
-                      <LogOut className="h-4 w-4 mr-2" />退出登录
-                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleLogout}><LogOut className="h-4 w-4 mr-2" />退出登录</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
                 <Button variant="ghost" size="sm" onClick={() => navigate('/login')} className="gap-2">
                   <User className="h-4 w-4" />
-                  登录 / 注册
+                  <span className="hidden sm:inline">登录 / 注册</span>
                 </Button>
               )
             )}
+            <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileOpen(!mobileOpen)}>
+              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
           </div>
         </div>
+
+        {/* Mobile nav */}
+        {mobileOpen && (
+          <div className="md:hidden border-t bg-card px-4 py-3 space-y-1">
+            {navItems.map(item => (
+              <Link
+                key={item.to}
+                to={item.to}
+                onClick={() => setMobileOpen(false)}
+                className={`block px-3 py-2 rounded-md text-sm ${
+                  location.pathname === item.to ? 'bg-primary/10 text-primary font-medium' : 'text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        )}
       </header>
 
       <main className="flex-1"><Outlet /></main>
