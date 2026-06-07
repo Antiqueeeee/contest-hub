@@ -572,6 +572,13 @@ erDiagram
     Contest ||--|{ Registration : "报名记录"
     Registration ||--o| Result : "对应成绩"
     Result }o--|| Award : "获得奖项"
+    SiteContent ||--|| User : "编辑者"
+
+    SiteContent {
+        bigint id PK
+        string page_key "about/faq/contact"
+        text content "HTML内容"
+    }
 
     User {
         bigint id PK
@@ -692,6 +699,8 @@ erDiagram
 | 成绩列表 | /admin/results | 按赛事查看，Tab 切换 |
 | 成绩录入 | /admin/results/:id/edit | 弹窗逐条录入 |
 | 数据导出 | /admin/export | 选择类型 → 赛事 → 字段 |
+| 站点内容 | /admin/site-content | 编辑关于/FAQ/联系页面 |
+| 管理员管理 | /admin/users | 添加/编辑/禁用/重置密码 |
 
 ### 5.2 前台门户（H5/PC）
 
@@ -706,6 +715,9 @@ erDiagram
 | 报名成功 | /contests/:id/register/success | 显示报名编号 |
 | 成绩查询 | /contests/:id/results | 输入编号+手机号查成绩（登录后可直接查看） |
 | 选手中心 | /me | 我的报名 + 我的成绩 + 个人信息 |
+| 平台介绍 | /about | 从数据库读取内容 |
+| 常见问题 | /faq | 从数据库读取内容 |
+| 联系我们 | /contact | 从数据库读取内容 |
 
 ---
 
@@ -801,6 +813,14 @@ erDiagram
 | GET | /api/public/home | 首页数据（新闻列表+赛事列表） |
 | GET | /api/public/news | 新闻列表 |
 | GET | /api/public/news/:id | 新闻详情 |
+
+### 6.10 站点内容
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /api/admin/site-content/:key | 获取页面内容（管理员） |
+| PUT | /api/admin/site-content/:key | 更新页面内容（管理员） |
+| GET | /api/public/site-content/:key | 获取页面内容（前台渲染） |
 
 ---
 
