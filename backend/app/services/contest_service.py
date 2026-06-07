@@ -61,6 +61,7 @@ async def create_contest(db: AsyncSession, data: ContestCreate, creator_id: int)
         registration_start=_parse_datetime(data.registration_start),
         registration_end=_parse_datetime(data.registration_end),
         max_participants=data.max_participants,
+        score_categories=data.score_categories,
     )
     db.add(contest)
     await db.flush()

@@ -65,6 +65,7 @@ class ContestCreate(BaseModel):
     registration_start: datetime | str
     registration_end: datetime | str
     max_participants: int = 0
+    score_categories: list[str] = ["客观题得分", "主观题得分"]
     groups: list[ContestGroupIn] = []
     awards: list[AwardIn] = []
     fields: list[ContestFieldIn] = []
@@ -80,6 +81,7 @@ class ContestUpdate(BaseModel):
     registration_start: datetime | str | None = None
     registration_end: datetime | str | None = None
     max_participants: int | None = None
+    score_categories: list[str] | None = None
     groups: list[ContestGroupIn] | None = None
     awards: list[AwardIn] | None = None
     fields: list[ContestFieldIn] | None = None
@@ -97,6 +99,7 @@ class ContestOut(BaseModel):
     registration_start: datetime
     registration_end: datetime
     max_participants: int
+    score_categories: list[str] | None = None
     status: str
     created_at: datetime
     updated_at: datetime

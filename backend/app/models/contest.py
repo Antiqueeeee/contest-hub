@@ -27,6 +27,7 @@ class Contest(Base):
     registration_start: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     registration_end: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     max_participants: Mapped[int] = mapped_column(Integer, default=0)
+    score_categories: Mapped[list | None] = mapped_column(JSON, nullable=True)
     status: Mapped[ContestStatus] = mapped_column(Enum(ContestStatus), default=ContestStatus.draft, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

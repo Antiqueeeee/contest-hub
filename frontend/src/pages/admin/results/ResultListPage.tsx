@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Upload, Download, Pencil, X } from 'lucide-react'
 
-interface ContestItem { id: number; title: string; status: string }
+interface ContestItem { id: number; title: string; status: string; score_categories: string[] | null }
 interface RegItem { id: number; registration_number: string; form_data: Record<string, string>; contest_id: number; group_id: number | null }
 interface ResultItem { id: number; registration_id: number; scores: Record<string, number>; total_score: number; rank: number | null; award_id: number | null; is_published: boolean }
 
@@ -21,8 +21,9 @@ export default function ResultListPage() {
   const [results, setResults] = useState<ResultItem[]>([])
   const [loading, setLoading] = useState(false)
   const [editReg, setEditReg] = useState<RegItem | null>(null)
-  const [editScores, setEditScores] = useState<Record<string, number>>({ 客观题得分: 0, 主观题得分: 0 })
+  const [editScores, setEditScores] = useState<Record<string, number>>({})
   const [saving, setSaving] = useState(false)
+  const [selectedContest, setSelectedContest] = useState<ContestItem | null>(null)
 
   // Load contests
   useEffect(() => {
@@ -57,7 +58,14 @@ export default function ResultListPage() {
   const openScoreDialog = (reg: RegItem) => {
     const existing = getResultForReg(reg.id)
     setEditReg(reg)
-    setEditScores(existing?.scores ? { ...existing.scores } : { 客观题得分: 0, 主观题得分: 0 })
+    if (existing?.scores) {
+      setEditScores({ ...existing.scores })
+    } else {
+      const cats = selectedContest?.score_categories || ['客观题得分', '主观题得分']
+      const initial: Record<string, number> = {}
+      cats.filter(c => c.trim()).forEach(c => { initial[c] = 0 })
+      setEditScores(initial)
+    }
   }
 
   const handleSaveScores = async () => {
@@ -139,7 +147,10 @@ export default function ResultListPage() {
       <div className="flex items-center gap-4">
         <div className="space-y-1">
           <Label>选择赛事</Label>
-          <select value={contestId} onChange={e => setContestId(e.target.value)} className={`${selectCls} w-64`}>
+          <select value={contestId} onChange={e => {
+          setContestId(e.target.value)
+          setSelectedContest(contests.find(c => String(c.id) === e.target.value) || null)
+        }} className={`${selectCls} w-64`}>
             <option value="">请选择已结束的赛事</option>
             {contests.map(c => <option key={c.id} value={String(c.id)}>{c.title}</option>)}
           </select>

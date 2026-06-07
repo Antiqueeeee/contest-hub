@@ -46,6 +46,9 @@ export default function ContestEditPage() {
   // Awards
   const [awardsList, setAwardsList] = useState<Award[]>([])
 
+  // Score categories
+  const [scoreCategories, setScoreCategories] = useState<string[]>(['客观题得分', '主观题得分'])
+
   // Fields
   const [fields, setFields] = useState<Field[]>([])
 
@@ -57,7 +60,7 @@ export default function ContestEditPage() {
     if (!isNew) {
       api.get<{
         title: string; description: string; location: string; start_date: string; end_date: string
-        registration_start: string; registration_end: string; max_participants: number
+        registration_start: string; registration_end: string; max_participants: number; score_categories: string[] | null
         groups: { id: number; name: string; template_item_id: number }[]; awards: Award[]; fields: Field[]
       }>(`/admin/contests/${id}`).then(c => {
         setTitle(c.title); setDescription(c.description); setLocation(c.location)
@@ -70,6 +73,7 @@ export default function ContestEditPage() {
         setMaxParticipants(String(c.max_participants || 0))
         setAwardsList(c.awards || [])
         setFields(c.fields || [])
+        if (c.score_categories?.length) setScoreCategories(c.score_categories)
         // Map contest groups to template item IDs for checkbox selection
         if (c.groups?.length > 0) {
           setSelectedGroupIds(c.groups.map(g => g.template_item_id || g.id))
@@ -102,6 +106,7 @@ export default function ContestEditPage() {
           return { name: `组别${gid}`, description: '', max_participants: 0, sort_order: i + 1, template_item_id: gid }
         }),
         awards: awardsList.filter(a => a.name),
+        score_categories: scoreCategories.filter(s => s.trim()),
         fields: fields.filter(f => f.field_name),
       }
       if (isNew) await api.post('/admin/contests', data)
@@ -194,7 +199,24 @@ export default function ContestEditPage() {
         </CardContent>
       </Card>
 
-      {/* 4. Registration Fields */}
+      {/* 4. Score Categories */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base">评分项设置</CardTitle>
+          <Button variant="outline" size="sm" onClick={() => setScoreCategories([...scoreCategories, ''])}><Plus className="h-3 w-3 mr-1" />添加评分项</Button>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">配置成绩录入时的评分维度，如：客观题得分、主观题得分、演讲内容、编程能力等</p>
+          {scoreCategories.map((cat, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <Input value={cat} onChange={e => { const ns = [...scoreCategories]; ns[i] = e.target.value; setScoreCategories(ns) }} placeholder={`评分项 ${i + 1}`} />
+              <Button variant="ghost" size="sm" onClick={() => setScoreCategories(scoreCategories.filter((_, ii) => ii !== i))}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* 5. Registration Fields */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">报名表单</CardTitle>
