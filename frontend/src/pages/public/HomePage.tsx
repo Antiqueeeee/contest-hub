@@ -14,15 +14,39 @@ export default function HomePage() {
   const [news, setNews] = useState<NewsItem[]>([])
   const [contests, setContests] = useState<ContestItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [contestPage, setContestPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const PAGE_SIZE = 6
+
+  const loadContests = async (page: number) => {
+    const res = await api.get<{ items: ContestItem[]; total: number }>(`/public/contests?page=${page}&page_size=${PAGE_SIZE}`)
+    const visible = res.items.filter(c => c.status !== 'draft' && c.status !== 'cancelled')
+    if (page === 1) {
+      setContests(visible)
+    } else {
+      setContests(prev => [...prev, ...visible])
+    }
+    // If we got fewer than PAGE_SIZE, we've loaded everything
+    setHasMore(res.items.length >= PAGE_SIZE)
+  }
 
   useEffect(() => {
     Promise.all([
       api.get<{ items: NewsItem[] }>('/public/news'),
-      api.get<{ items: ContestItem[] }>('/public/contests'),
-    ]).then(([n, c]) => { setNews(n.items); setContests(c.items) }).catch(console.error).finally(() => setLoading(false))
+      loadContests(1),
+    ]).catch(console.error).finally(() => setLoading(false))
     const hash = window.location.hash
     if (hash) setTimeout(() => document.querySelector(hash)?.scrollIntoView({ behavior: 'smooth' }), 300)
   }, [])
+
+  const handleLoadMore = async () => {
+    setLoadingMore(true)
+    const nextPage = contestPage + 1
+    await loadContests(nextPage)
+    setContestPage(nextPage)
+    setLoadingMore(false)
+  }
 
   const visibleContests = contests.filter(c => c.status !== 'draft' && c.status !== 'cancelled')
   const statusCfg: Record<string, { label: string; cls: string }> = {
@@ -105,9 +129,17 @@ export default function HomePage() {
             </Link>
           ))}
         </div>
-        <div className="text-center mt-4">
-          <Link to="/contests" className="text-sm text-primary hover:underline">查看全部赛事</Link>
-        </div>
+        {hasMore && (
+          <div className="text-center mt-6">
+            <button
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+              className="px-8 py-2.5 rounded-xl bg-muted text-sm font-medium text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-colors disabled:opacity-50"
+            >
+              {loadingMore ? '加载中...' : '加载更多赛事'}
+            </button>
+          </div>
+        )}
       </section>
     </div>
   )

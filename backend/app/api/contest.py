@@ -57,10 +57,14 @@ async def delete_contest(contest_id: int, db: AsyncSession = Depends(get_db), cu
 # --- Public ---
 
 @public_router.get("")
-async def public_contests_list(db: AsyncSession = Depends(get_db)):
-    items, _ = await contest_service.list_contests(db, page=1, page_size=50)
+async def public_contests_list(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    items, total = await contest_service.list_contests(db, page=page, page_size=page_size)
     visible = [ContestOut.model_validate(c).model_dump() for c in items if c.status.value not in ("draft", "cancelled")]
-    return {"items": visible, "total": len(visible)}
+    return {"items": visible, "total": total}
 
 
 @public_router.get("/{contest_id}", response_model=ContestOut)
