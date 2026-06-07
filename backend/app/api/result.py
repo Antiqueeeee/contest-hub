@@ -47,18 +47,41 @@ async def download_template(
     current_user: dict = Depends(get_current_user),
 ):
     from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
     from app.models.contest import Contest
+    from app.models.registration import Registration
     from sqlalchemy import select as sa_select
+
     r = await db.execute(sa_select(Contest).where(Contest.id == contest_id))
     contest = r.scalar_one_or_none()
     cats = contest.score_categories if contest and contest.score_categories else ["客观题得分", "主观题得分"]
 
+    # Get registrations
+    regs_r = await db.execute(
+        sa_select(Registration).where(Registration.contest_id == contest_id, Registration.deleted_at.is_(None))
+        .order_by(Registration.submitted_at)
+    )
+    registrations = list(regs_r.scalars().all())
+
     wb = Workbook()
     ws = wb.active
     ws.title = "成绩导入模板"
-    headers = ["报名编号"] + [c for c in cats if c.strip()] + ["总分", "排名", "奖项"]
+
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    header_font = Font(color="FFFFFF", bold=True)
+
+    clean_cats = [c for c in cats if c.strip()]
+    headers = ["报名编号", "姓名"] + clean_cats + ["总分", "排名", "奖项"]
     for col, h in enumerate(headers, 1):
-        ws.cell(row=1, column=col, value=h)
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.fill = header_fill
+        cell.font = header_font
+
+    # Pre-fill registration numbers and names
+    for row_idx, reg in enumerate(registrations, 2):
+        ws.cell(row=row_idx, column=1, value=reg.registration_number)
+        ws.cell(row=row_idx, column=2, value=reg.form_data.get("name", ""))
+
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)

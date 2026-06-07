@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,8 +16,10 @@ interface ResultItem { id: number; registration_id: number; scores: Record<strin
 const selectCls = "h-10 rounded-md border border-input bg-background px-3 text-sm"
 
 export default function ResultListPage() {
+  const [searchParams] = useSearchParams()
+  const urlContestId = searchParams.get('contest_id') || ''
   const [contests, setContests] = useState<ContestItem[]>([])
-  const [contestId, setContestId] = useState('')
+  const [contestId, setContestId] = useState(urlContestId)
   const [registrations, setRegistrations] = useState<RegItem[]>([])
   const [results, setResults] = useState<ResultItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -27,10 +30,15 @@ export default function ResultListPage() {
 
   // Load contests
   useEffect(() => {
-    api.get<{ items: ContestItem[] }>('/admin/contests').then(r =>
-      setContests(r.items.filter(c => c.status === 'finished'))
-    ).catch(() => {})
-  }, [])
+    api.get<{ items: ContestItem[] }>('/admin/contests').then(r => {
+      const finished = r.items.filter(c => c.status === 'finished')
+      setContests(finished)
+      if (urlContestId) {
+        const found = finished.find(c => String(c.id) === urlContestId)
+        if (found) setSelectedContest(found)
+      }
+    }).catch(() => {})
+  }, [urlContestId])
 
   // Load data when contest selected
   useEffect(() => {

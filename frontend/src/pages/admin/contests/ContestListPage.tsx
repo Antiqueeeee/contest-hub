@@ -95,7 +95,7 @@ export default function ContestListPage() {
                   {c.status === 'ongoing' && <Button variant="ghost" size="sm" onClick={() => handleStatusChange(c.id, 'finished')}>结束比赛</Button>}
                   {c.status === 'open' && <Button variant="ghost" size="sm" onClick={() => handleStatusChange(c.id, 'cancelled')} className="text-destructive">取消</Button>}
                   {(c.status === 'open' || c.status === 'ongoing') && <Link to={`/admin/registrations?contestId=${c.id}`}><Button variant="ghost" size="sm">报名</Button></Link>}
-                  {c.status === 'finished' && <Link to={`/admin/results?contestId=${c.id}`}><Button variant="ghost" size="sm">成绩</Button></Link>}
+                  {c.status === 'finished' && <Link to={`/admin/results?contest_id=${c.id}`}><Button variant="ghost" size="sm">成绩</Button></Link>}
                 </TableCell>
               </TableRow>
             )
