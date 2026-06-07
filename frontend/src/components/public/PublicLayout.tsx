@@ -23,7 +23,7 @@ export function PublicLayout() {
   const handleLogout = () => { logout(); navigate('/') }
 
   const displayNav = isLoggedIn
-    ? [...navItems.slice(0, 5), { to: '/me', label: '个人中心' }, ...navItems.slice(5)]
+    ? [...navItems, { to: '/me', label: '个人中心' }]
     : navItems
 
   return (

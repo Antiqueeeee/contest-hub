@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
@@ -17,10 +17,9 @@ export default function LoginPage() {
   const { login, isLoggedIn } = useAuth()
   const navigate = useNavigate()
 
-  if (isLoggedIn) {
-    navigate('/admin', { replace: true })
-    return null
-  }
+  useEffect(() => {
+    if (isLoggedIn) navigate('/admin', { replace: true })
+  }, [isLoggedIn, navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

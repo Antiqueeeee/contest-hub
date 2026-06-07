@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useContestantAuth } from '@/hooks/useContestantAuth'
 import { Button } from '@/components/ui/button'
@@ -17,7 +17,9 @@ export default function LoginPage() {
   const { login, isLoggedIn } = useContestantAuth()
   const navigate = useNavigate()
 
-  if (isLoggedIn) { navigate('/', { replace: true }); return null }
+  useEffect(() => {
+    if (isLoggedIn) navigate('/', { replace: true })
+  }, [isLoggedIn, navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setSubmitting(true); setError('')
