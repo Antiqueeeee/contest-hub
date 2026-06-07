@@ -1,0 +1,33 @@
+from datetime import datetime
+from pydantic import BaseModel, Field
+
+
+class RegistrationCreate(BaseModel):
+    contest_id: int
+    group_id: int | None = None
+    name: str = Field(min_length=2, max_length=20)
+    phone: str = Field(pattern=r"^1\d{10}$")
+    custom_fields: dict[str, str] = {}
+    privacy_agreed: bool = True
+
+
+class RegistrationOut(BaseModel):
+    id: int
+    contest_id: int
+    group_id: int | None
+    registration_number: str
+    form_data: dict
+    submitted_at: datetime
+    model_config = {"from_attributes": True}
+
+
+class RegistrationListOut(BaseModel):
+    items: list[RegistrationOut]
+    total: int
+
+
+class ExportRequest(BaseModel):
+    export_type: str = Field(pattern="^(registration|result)$")
+    contest_id: int
+    group_ids: list[int] | None = None
+    fields: list[str] = []
