@@ -20,6 +20,13 @@ export default function HomePage() {
       api.get<{ items: NewsItem[] }>('/public/news'),
       api.get<{ items: ContestItem[] }>('/public/contests'),
     ]).then(([n, c]) => { setNews(n.items); setContests(c.items) }).catch(console.error).finally(() => setLoading(false))
+    // Scroll to hash if present
+    const hash = window.location.hash
+    if (hash) {
+      setTimeout(() => {
+        document.querySelector(hash)?.scrollIntoView({ behavior: 'smooth' })
+      }, 300)
+    }
   }, [])
 
   const openContests = contests.filter(c => c.status === 'open')
@@ -67,7 +74,7 @@ export default function HomePage() {
         </section>
       )}
 
-      <section className="max-w-6xl mx-auto px-6 mt-14">
+      <section id="news" className="max-w-6xl mx-auto px-6 mt-14">
         <div className="mb-6"><h2 className="text-2xl font-bold">新闻资讯</h2><p className="text-muted-foreground text-sm mt-1">最新赛事动态与通知</p></div>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {news.slice(0, 4).map(n => (
@@ -84,7 +91,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="max-w-6xl mx-auto px-6 mt-14 mb-8">
+      <section id="contests" className="max-w-6xl mx-auto px-6 mt-14 mb-8">
         <div className="mb-6"><h2 className="text-2xl font-bold">全部赛事</h2><p className="text-muted-foreground text-sm mt-1">浏览所有进行中和已结束的竞赛</p></div>
         <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {visibleContests.map(c => (
