@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Plus, Search } from 'lucide-react'
-import { useCallback } from 'react'
 
 interface ContestItem {
   id: number; title: string; status: string; max_participants: number
