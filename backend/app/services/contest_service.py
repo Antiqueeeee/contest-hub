@@ -66,11 +66,14 @@ async def create_contest(db: AsyncSession, data: ContestCreate, creator_id: int)
     await db.flush()
 
     for g in data.groups:
-        db.add(ContestGroup(contest_id=contest.id, **g.model_dump()))
+        gd = g.model_dump() if hasattr(g, 'model_dump') else g
+        db.add(ContestGroup(contest_id=contest.id, **gd))
     for a in data.awards:
-        db.add(Award(contest_id=contest.id, **a.model_dump()))
+        ad = a.model_dump() if hasattr(a, 'model_dump') else a
+        db.add(Award(contest_id=contest.id, **ad))
     for f in data.fields:
-        db.add(ContestField(contest_id=contest.id, **f.model_dump()))
+        fd = f.model_dump() if hasattr(f, 'model_dump') else f
+        db.add(ContestField(contest_id=contest.id, **fd))
 
     await db.commit()
     await db.refresh(contest)
@@ -107,21 +110,24 @@ async def update_contest(db: AsyncSession, contest_id: int, data: ContestUpdate)
         for eg in existing:
             await db.delete(eg)
         for g in groups_data:
-            db.add(ContestGroup(contest_id=contest_id, **g.model_dump()))
+            gd = g.model_dump() if hasattr(g, 'model_dump') else g
+            db.add(ContestGroup(contest_id=contest_id, **gd))
 
     if awards_data is not None:
         existing = (await db.execute(select(Award).where(Award.contest_id == contest_id))).scalars().all()
         for ea in existing:
             await db.delete(ea)
         for a in awards_data:
-            db.add(Award(contest_id=contest_id, **a.model_dump()))
+            ad = a.model_dump() if hasattr(a, 'model_dump') else a
+            db.add(Award(contest_id=contest_id, **ad))
 
     if fields_data is not None:
         existing = (await db.execute(select(ContestField).where(ContestField.contest_id == contest_id))).scalars().all()
         for ef in existing:
             await db.delete(ef)
         for f in fields_data:
-            db.add(ContestField(contest_id=contest_id, **f.model_dump()))
+            fd = f.model_dump() if hasattr(f, 'model_dump') else f
+            db.add(ContestField(contest_id=contest_id, **fd))
 
     await db.commit()
     return await get_contest(db, contest_id)
