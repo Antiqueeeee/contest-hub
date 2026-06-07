@@ -12,11 +12,8 @@ export function PublicLayout() {
             </div>
             <span>竞赛信息发布平台</span>
           </Link>
-          <nav className="flex items-center gap-4 text-sm">
-            <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">首页</Link>
-            <Link to="/admin/login" className="text-muted-foreground hover:text-foreground transition-colors text-sm">
-              管理后台
-            </Link>
+          <nav className="flex items-center gap-6 text-sm">
+            <Link to="/" className="text-foreground hover:text-primary transition-colors font-medium">首页</Link>
           </nav>
         </div>
       </header>
