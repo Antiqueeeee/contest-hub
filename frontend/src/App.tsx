@@ -15,6 +15,7 @@ import RegistrationListPage from '@/pages/admin/RegistrationListPage'
 import ResultListPage from '@/pages/admin/results/ResultListPage'
 import ExportPage from '@/pages/admin/ExportPage'
 import SiteContentPage from '@/pages/admin/SiteContentPage'
+import GroupManagementPage from '@/pages/admin/GroupManagementPage'
 import HomePage from '@/pages/public/HomePage'
 import NewsDetailPage from '@/pages/public/NewsDetailPage'
 import ContestDetailPage from '@/pages/public/ContestDetailPage'
@@ -82,6 +83,7 @@ export default function App() {
         <Route path="results" element={<ResultListPage />} />
         <Route path="export" element={<ExportPage />} />
         <Route path="site-content" element={<SiteContentPage />} />
+        <Route path="groups" element={<GroupManagementPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

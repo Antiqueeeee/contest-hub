@@ -22,6 +22,7 @@ const sidebarNavItems = [
     label: '赛事管理', icon: Flag,
     children: [
       { to: '/admin/contests', label: '赛事列表' },
+      { to: '/admin/groups', label: '组别管理' },
     ],
   },
   { to: '/admin/registrations', icon: ClipboardList, label: '报名管理' },

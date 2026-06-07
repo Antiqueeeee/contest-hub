@@ -10,6 +10,7 @@ from app.api.registration import admin_router as reg_admin_router, public_router
 from app.api.result import admin_router as result_admin_router, public_router as result_public_router
 from app.api.contestant import router as contestant_router
 from app.api.site_content import admin_router as site_content_admin, public_router as site_content_public
+from app.api.groups import router as groups_router
 
 
 @asynccontextmanager
@@ -55,6 +56,9 @@ app.include_router(contestant_router)
 # Site Content
 app.include_router(site_content_admin)
 app.include_router(site_content_public)
+
+# Groups
+app.include_router(groups_router)
 
 
 @app.get("/api/health")
