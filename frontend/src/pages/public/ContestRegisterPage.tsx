@@ -5,7 +5,6 @@ import { useContestantAuth, getCToken } from '@/hooks/useContestantAuth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ArrowLeft, Clock } from 'lucide-react'
@@ -75,10 +74,10 @@ export default function ContestRegisterPage() {
           <div className="space-y-1"><Label>手机号 <span className="text-destructive">*</span></Label><Input value={phone} onChange={e => { setPhone(e.target.value); setErrors({}) }} placeholder="请输入 11 位手机号" maxLength={11} disabled={isLoggedIn} />{errors.phone && <p className="text-sm text-destructive">{errors.phone}</p>}</div>
           {contest.groups?.length > 0 && (
             <div className="space-y-1"><Label>参赛组别</Label>
-              <Select value={groupId} onValueChange={(v) => { setGroupId(v ?? ''); setErrors({}) }}>
-                <SelectTrigger><SelectValue placeholder="请选择组别" /></SelectTrigger>
-                <SelectContent>{contest.groups.map(g => <SelectItem key={g.id} value={String(g.id)}>{g.name}{g.max_participants > 0 ? ` (限${g.max_participants}人)` : ''}</SelectItem>)}</SelectContent>
-              </Select>
+              <select value={groupId} onChange={e => { setGroupId(e.target.value); setErrors({}) }} className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
+                <option value="">请选择组别</option>
+                {contest.groups.map(g => <option key={g.id} value={String(g.id)}>{g.name}{g.max_participants > 0 ? ` (限${g.max_participants}人)` : ''}</option>)}
+              </select>
             </div>
           )}
           {contest.fields?.map(f => (

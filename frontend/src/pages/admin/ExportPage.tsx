@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Download } from 'lucide-react'
 
 interface Contest { id: number; title: string }
+
+const selectCls = "w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
 
 export default function ExportPage() {
   const [exportType, setExportType] = useState<'registration' | 'result'>('registration')
@@ -35,7 +36,6 @@ export default function ExportPage() {
     setExporting(true)
     try {
       const res = await api.post<{ task_id: string }>('/admin/export', { export_type: exportType, contest_id: Number(contestId), fields: selectedFields })
-      // Poll for completion
       let attempts = 0
       while (attempts < 30) {
         await new Promise(r => setTimeout(r, 1000))
@@ -59,17 +59,19 @@ export default function ExportPage() {
       <h1 className="text-2xl font-bold">数据导出</h1>
       <Card><CardHeader><CardTitle className="text-base">步骤 1：选择导出类型和范围</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-2 gap-4">
-          <div className="space-y-1"><Label>导出类型</Label>
-            <Select value={exportType} onValueChange={v => { setExportType((v as 'registration' | 'result') || 'registration'); setSelectedFields([]) }}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value="registration">报名数据</SelectItem><SelectItem value="result">成绩数据</SelectItem></SelectContent>
-            </Select>
+          <div className="space-y-1">
+            <Label>导出类型</Label>
+            <select value={exportType} onChange={e => { setExportType(e.target.value as 'registration' | 'result'); setSelectedFields([]) }} className={selectCls}>
+              <option value="registration">报名数据</option>
+              <option value="result">成绩数据</option>
+            </select>
           </div>
-          <div className="space-y-1"><Label>选择赛事</Label>
-            <Select value={contestId} onValueChange={(v) => setContestId(v ?? '')}>
-              <SelectTrigger><SelectValue placeholder="请选择" /></SelectTrigger>
-              <SelectContent>{contests.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.title}</SelectItem>)}</SelectContent>
-            </Select>
+          <div className="space-y-1">
+            <Label>选择赛事</Label>
+            <select value={contestId} onChange={e => setContestId(e.target.value)} className={selectCls}>
+              <option value="">请选择赛事</option>
+              {contests.map(c => <option key={c.id} value={String(c.id)}>{c.title}</option>)}
+            </select>
           </div>
         </CardContent></Card>
 

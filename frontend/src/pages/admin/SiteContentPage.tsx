@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 
@@ -43,12 +42,9 @@ export default function SiteContentPage() {
         <CardContent className="space-y-4">
           <div className="space-y-1">
             <Label>选择页面</Label>
-            <Select value={pageKey} onValueChange={(v) => setPageKey(v ?? 'about')}>
-              <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {pages.map(p => <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <select value={pageKey} onChange={e => setPageKey(e.target.value)} className="h-10 rounded-md border border-input bg-background px-3 text-sm w-48">
+              {pages.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
+            </select>
           </div>
           <div className="space-y-1">
             <Label>内容（支持 HTML）</Label>

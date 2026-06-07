@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface Category { id: number; name: string }
@@ -59,12 +58,10 @@ export default function NewsEditPage() {
             <Input value={title} onChange={e => setTitle(e.target.value)} maxLength={200} placeholder="请输入新闻标题" />
           </div>
           <div className="space-y-1"><Label>分类</Label>
-            <Select value={categoryId} onValueChange={(v) => setCategoryId(v ?? '')}>
-              <SelectTrigger><SelectValue placeholder="选择分类" /></SelectTrigger>
-              <SelectContent>
-                {categories.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
+              <option value="">选择分类</option>
+              {categories.map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+            </select>
           </div>
           <div className="space-y-1"><Label>正文</Label>
             <Textarea value={content} onChange={e => setContent(e.target.value)} className="min-h-[300px] font-mono text-sm" placeholder="支持 HTML 格式" />

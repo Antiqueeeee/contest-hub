@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Search, Eye, Trash2 } from 'lucide-react'
@@ -48,10 +47,10 @@ export default function RegistrationListPage() {
       <h1 className="text-2xl font-bold">报名管理</h1>
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-xs"><Search className="h-4 w-4 absolute left-2.5 top-2.5 text-muted-foreground" /><Input placeholder="搜索姓名/编号..." className="pl-8" value={keyword} onChange={e => setKeyword(e.target.value)} /></div>
-        <Select value={contestFilter} onValueChange={(v) => setContestFilter(v ?? 'all')}>
-          <SelectTrigger className="w-48"><SelectValue placeholder="选择赛事" /></SelectTrigger>
-          <SelectContent><SelectItem value="all">全部赛事</SelectItem>{contests.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.title}</SelectItem>)}</SelectContent>
-        </Select>
+        <select value={contestFilter} onChange={e => setContestFilter(e.target.value)} className="h-10 rounded-md border border-input bg-background px-3 text-sm w-48">
+          <option value="all">全部赛事</option>
+          {contests.map(c => <option key={c.id} value={String(c.id)}>{c.title}</option>)}
+        </select>
       </div>
       <Table>
         <TableHeader><TableRow><TableHead>报名编号</TableHead><TableHead>姓名</TableHead><TableHead>手机号</TableHead><TableHead>报名时间</TableHead><TableHead className="text-right">操作</TableHead></TableRow></TableHeader>

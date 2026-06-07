@@ -4,7 +4,6 @@ import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Search } from 'lucide-react'
 
@@ -45,10 +44,10 @@ export default function GeneralResultQueryPage() {
         <CardHeader><CardTitle className="text-lg">查询您的比赛成绩</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-1"><Label>选择赛事</Label>
-            <Select value={contestId} onValueChange={(v) => { setContestId(v ?? ''); setQueried(false) }}>
-              <SelectTrigger><SelectValue placeholder="请选择已结束的赛事" /></SelectTrigger>
-              <SelectContent>{contests.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.title}</SelectItem>)}</SelectContent>
-            </Select>
+            <select value={contestId} onChange={e => { setContestId(e.target.value); setQueried(false) }} className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
+              <option value="">请选择已结束的赛事</option>
+              {contests.map(c => <option key={c.id} value={String(c.id)}>{c.title}</option>)}
+            </select>
           </div>
           <div className="space-y-1"><Label>报名编号</Label><Input value={regNumber} onChange={e => { setRegNumber(e.target.value); setQueried(false) }} placeholder="请输入报名编号" /></div>
           <div className="space-y-1"><Label>手机号</Label><Input value={phone} onChange={e => { setPhone(e.target.value); setQueried(false) }} placeholder="请输入报名时填写的手机号" maxLength={11} /></div>
