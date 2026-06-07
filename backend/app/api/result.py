@@ -105,20 +105,17 @@ async def import_results(
 
     # Read header row
     headers = [str(cell.value).strip() if cell.value else "" for cell in ws[1]]
-    # Columns: 报名编号 | [score categories ...] | 总分 | 排名 | 奖项
-    # Identify score columns (between 报名编号 and 总分)
+    # Columns: 报名编号 | 姓名 | [score categories ...] | 总分 | 排名 | 奖项
+    non_score = {"报名编号", "姓名", "总分", "排名", "奖项"}
     score_cols = []
     total_col = -1
     rank_col = -1
     award_col = -1
     for i, h in enumerate(headers):
-        if h == "总分":
-            total_col = i
-        elif h == "排名":
-            rank_col = i
-        elif h == "奖项":
-            award_col = i
-        elif h != "报名编号":
+        if h == "总分": total_col = i
+        elif h == "排名": rank_col = i
+        elif h == "奖项": award_col = i
+        elif h not in non_score:
             score_cols.append((i, h))
 
     success_count = 0
