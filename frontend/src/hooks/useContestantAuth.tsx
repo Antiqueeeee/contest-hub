@@ -34,18 +34,16 @@ interface AuthCtx {
 
 const AuthContext = createContext<AuthCtx | null>(null)
 
-export function ContestantAuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<Contestant | null>(null)
-  const [loading, setLoading] = useState(true)
+function loadUser(): Contestant | null {
+  try {
+    const stored = sessionStorage.getItem(USER_KEY)
+    return stored ? JSON.parse(stored) : null
+  } catch { return null }
+}
 
-  // Restore session on mount
-  useEffect(() => {
-    try {
-      const stored = sessionStorage.getItem(USER_KEY)
-      if (stored) setUser(JSON.parse(stored))
-    } catch { /* */ }
-    setLoading(false)
-  }, [])
+export function ContestantAuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<Contestant | null>(loadUser)
+  const [loading, setLoading] = useState(false)
 
   const login = useCallback(async (phone: string, password: string) => {
     const res = await api.post<{ access_token: string; user: Contestant }>('/auth/contestant/login', { phone, password })

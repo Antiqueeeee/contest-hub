@@ -56,10 +56,10 @@ export function PublicLayout() {
               isLoggedIn ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger>
-                    <Button variant="ghost" size="sm" className="gap-2" type="button">
+                    <span className="inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-accent transition-colors cursor-pointer">
                       <User className="h-4 w-4" />
                       <span className="hidden sm:inline">{user?.name}</span>
-                    </Button>
+                    </span>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-40">
                     <DropdownMenuItem onClick={() => navigate('/me')}><User className="h-4 w-4 mr-2" />个人中心</DropdownMenuItem>
