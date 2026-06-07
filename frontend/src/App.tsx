@@ -3,7 +3,7 @@ import { AdminLayout } from '@/components/admin/AdminLayout'
 import { PublicLayout } from '@/components/public/PublicLayout'
 import { useAuth } from '@/hooks/useAuth'
 
-import LoginPage from '@/pages/admin/LoginPage'
+import AdminLoginPage from '@/pages/admin/LoginPage'
 import DashboardPage from '@/pages/admin/DashboardPage'
 import AdminUsersPage from '@/pages/admin/AdminUsersPage'
 import NewsListPage from '@/pages/admin/news/NewsListPage'
@@ -17,9 +17,12 @@ import ExportPage from '@/pages/admin/ExportPage'
 import HomePage from '@/pages/public/HomePage'
 import NewsDetailPage from '@/pages/public/NewsDetailPage'
 import ContestDetailPage from '@/pages/public/ContestDetailPage'
-import RegisterPage from '@/pages/public/RegisterPage'
+import ContestRegisterPage from '@/pages/public/ContestRegisterPage'
 import RegisterSuccessPage from '@/pages/public/RegisterSuccessPage'
 import ResultQueryPage from '@/pages/public/ResultQueryPage'
+import ContestantLoginPage from '@/pages/public/LoginPage'
+import ContestantRegisterPage from '@/pages/public/ContestantRegisterPage'
+import ContestantCenterPage from '@/pages/public/ContestantCenterPage'
 
 function AdminGuard({ children }: { children: React.ReactNode }) {
   const { isLoggedIn } = useAuth()
@@ -35,13 +38,16 @@ export default function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/news/:id" element={<NewsDetailPage />} />
         <Route path="/contests/:id" element={<ContestDetailPage />} />
-        <Route path="/contests/:id/register" element={<RegisterPage />} />
+        <Route path="/contests/:id/register" element={<ContestRegisterPage />} />
         <Route path="/contests/:id/register/success" element={<RegisterSuccessPage />} />
         <Route path="/contests/:id/results" element={<ResultQueryPage />} />
+        <Route path="/login" element={<ContestantLoginPage />} />
+        <Route path="/register" element={<ContestantRegisterPage />} />
+        <Route path="/me" element={<ContestantCenterPage />} />
       </Route>
 
       {/* Admin */}
-      <Route path="/admin/login" element={<LoginPage />} />
+      <Route path="/admin/login" element={<AdminLoginPage />} />
       <Route
         path="/admin"
         element={

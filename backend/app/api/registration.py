@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.middleware.auth import get_current_user
+from app.middleware.contestant_auth import get_optional_contestant
 from app.schemas.registration import RegistrationCreate, RegistrationOut, ExportRequest
 from app.services import registration_service, export_service
 
@@ -40,9 +41,14 @@ async def delete_registration(reg_id: int, db: AsyncSession = Depends(get_db), c
 # --- Public ---
 
 @public_router.post("/{contest_id}/register", response_model=RegistrationOut, status_code=201)
-async def submit_registration(contest_id: int, data: RegistrationCreate, db: AsyncSession = Depends(get_db)):
+async def submit_registration(
+    contest_id: int,
+    data: RegistrationCreate,
+    db: AsyncSession = Depends(get_db),
+    contestant: dict | None = Depends(get_optional_contestant),
+):
     data.contest_id = contest_id
-    return await registration_service.register(db, data)
+    return await registration_service.register(db, data, contestant_id=contestant["contestant_id"] if contestant else None)
 
 
 # --- Export ---

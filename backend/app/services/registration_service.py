@@ -14,7 +14,7 @@ def _gen_registration_number(contest_id: int, seq: int) -> str:
     return f"C{contest_id:03d}-{date_str}-{seq:04d}"
 
 
-async def register(db: AsyncSession, data: RegistrationCreate) -> Registration:
+async def register(db: AsyncSession, data: RegistrationCreate, contestant_id: int | None = None) -> Registration:
     # Validate contest is open
     result = await db.execute(select(Contest).where(Contest.id == data.contest_id))
     contest = result.scalar_one_or_none()
@@ -65,6 +65,7 @@ async def register(db: AsyncSession, data: RegistrationCreate) -> Registration:
 
     reg = Registration(
         contest_id=data.contest_id,
+        contestant_id=contestant_id,
         group_id=data.group_id,
         registration_number=_gen_registration_number(data.contest_id, seq),
         form_data=form_data,

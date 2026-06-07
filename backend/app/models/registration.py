@@ -9,6 +9,7 @@ class Registration(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     contest_id: Mapped[int] = mapped_column(ForeignKey("contests.id"), nullable=False, index=True)
+    contestant_id: Mapped[int | None] = mapped_column(ForeignKey("contestants.id"), nullable=True, index=True)
     group_id: Mapped[int | None] = mapped_column(ForeignKey("contest_groups.id"), nullable=True)
     registration_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     form_data: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
