@@ -49,7 +49,7 @@ async def update_profile(data: ContestantProfileUpdate, current: dict = Depends(
 @router.get("/contestant/registrations")
 async def my_registrations(current: dict = Depends(get_current_contestant), db: AsyncSession = Depends(get_db)):
     items = await contestant_service.get_my_registrations(db, current["contestant_id"])
-    return {"items": [{"id": r.id, "registration_number": r.registration_number, "form_data": r.form_data, "submitted_at": r.submitted_at.isoformat() if r.submitted_at else None} for r in items]}
+    return {"items": items}
 
 
 @router.get("/contestant/results")

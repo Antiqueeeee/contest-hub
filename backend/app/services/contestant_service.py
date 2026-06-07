@@ -64,22 +64,37 @@ async def update_contestant_profile(db: AsyncSession, contestant_id: int, name: 
     return c
 
 
-async def get_my_registrations(db: AsyncSession, contestant_id: int) -> list[Registration]:
+async def get_my_registrations(db: AsyncSession, contestant_id: int) -> list[dict]:
+    from app.models.contest import Contest
     result = await db.execute(
         select(Registration).where(Registration.contestant_id == contestant_id, Registration.deleted_at.is_(None))
         .order_by(Registration.submitted_at.desc())
     )
-    return list(result.scalars().all())
+    regs = list(result.scalars().all())
+    output = []
+    for reg in regs:
+        ct = await db.execute(select(Contest).where(Contest.id == reg.contest_id))
+        contest = ct.scalar_one_or_none()
+        output.append({
+            "id": reg.id,
+            "registration_number": reg.registration_number,
+            "contest_id": reg.contest_id,
+            "contest_title": contest.title if contest else "未知赛事",
+            "form_data": reg.form_data,
+            "submitted_at": reg.submitted_at.isoformat() if reg.submitted_at else None,
+        })
+    return output
 
 
 async def get_my_results(db: AsyncSession, contestant_id: int) -> list[dict]:
-    regs = await get_my_registrations(db, contestant_id)
+    from app.models.contest import Award
+    reg_data = await get_my_registrations(db, contestant_id)
+    # reg_data is list[dict] with contest_title etc
     results_list = []
-    for reg in regs:
-        r = await db.execute(select(Result).where(Result.registration_id == reg.id, Result.is_published == True))
+    for reg_dict in reg_data:
+        r = await db.execute(select(Result).where(Result.registration_id == reg_dict["id"], Result.is_published == True))
         result = r.scalar_one_or_none()
         if result:
-            from app.models.contest import Award
             award_name = ""
             if result.award_id:
                 a = await db.execute(select(Award).where(Award.id == result.award_id))
@@ -87,8 +102,12 @@ async def get_my_results(db: AsyncSession, contestant_id: int) -> list[dict]:
                 if award:
                     award_name = award.name
             results_list.append({
-                "id": result.id, "registration_number": reg.registration_number,
-                "total_score": float(result.total_score), "rank": result.rank,
-                "award_name": award_name, "scores": result.scores,
+                "id": result.id,
+                "registration_number": reg_dict["registration_number"],
+                "contest_title": reg_dict["contest_title"],
+                "total_score": float(result.total_score),
+                "rank": result.rank,
+                "award_name": award_name,
+                "scores": result.scores,
             })
     return results_list

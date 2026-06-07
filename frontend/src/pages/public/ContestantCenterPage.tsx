@@ -109,10 +109,11 @@ export default function ContestantCenterPage() {
               ) : (
                 <Card className="border-0 shadow-sm">
                   <Table>
-                    <TableHeader><TableRow><TableHead>报名编号</TableHead><TableHead>姓名</TableHead><TableHead>报名时间</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead>赛事</TableHead><TableHead>报名编号</TableHead><TableHead>姓名</TableHead><TableHead>报名时间</TableHead></TableRow></TableHeader>
                     <TableBody>
                       {registrations.map((r: any) => (
                         <TableRow key={r.id}>
+                          <TableCell className="text-sm max-w-[150px] truncate">{r.contest_title || '-'}</TableCell>
                           <TableCell className="font-mono text-sm">{r.registration_number}</TableCell>
                           <TableCell>{r.form_data?.name || '-'}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">{r.submitted_at?.split('.')[0]}</TableCell>
@@ -138,7 +139,7 @@ export default function ContestantCenterPage() {
               ) : (
                 <Card className="border-0 shadow-sm">
                   <Table>
-                    <TableHeader><TableRow><TableHead>报名编号</TableHead><TableHead>总分</TableHead><TableHead>排名</TableHead><TableHead>奖项</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead>赛事</TableHead><TableHead>报名编号</TableHead><TableHead>总分</TableHead><TableHead>排名</TableHead><TableHead>奖项</TableHead></TableRow></TableHeader>
                     <TableBody>
                       {results.map((r: any) => (
                         <TableRow key={r.id}>
