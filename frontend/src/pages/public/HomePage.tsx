@@ -132,17 +132,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="max-w-6xl mx-auto px-6 mt-14 mb-8">
-        <div className="bg-accent rounded-2xl p-10 text-center">
-          <Trophy className="h-10 w-10 text-primary mx-auto mb-3" />
-          <h2 className="text-xl font-bold mb-2">开始管理您的竞赛</h2>
-          <p className="text-muted-foreground mb-6 max-w-md mx-auto text-sm">登录管理后台，3分钟即可创建第一场竞赛</p>
-          <Link to="/admin/login" className="inline-flex items-center gap-2 px-8 py-3 bg-primary text-primary-foreground rounded-xl font-semibold hover:bg-primary/90 transition-colors no-underline shadow-lg">
-            进入管理后台 <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-      </section>
     </div>
   )
 }
