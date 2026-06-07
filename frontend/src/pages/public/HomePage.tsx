@@ -36,16 +36,11 @@ export default function HomePage() {
             <p className="text-lg text-white/80 mb-8">
               一站式管理赛事宣传、在线报名、成绩发布与数据导出
             </p>
-            <div className="flex items-center gap-4">
-              {openContests.length > 0 && (
-                <Link to={`/contests/${openContests[0].id}`} className="inline-flex items-center gap-2 px-6 py-3 bg-white text-primary rounded-xl font-semibold hover:shadow-lg transition-shadow no-underline">
-                  立即报名 <ArrowRight className="h-4 w-4" />
-                </Link>
-              )}
-              <Link to="/admin/login" className="inline-flex items-center gap-2 px-6 py-3 border-2 border-white/30 rounded-xl font-semibold hover:bg-white/10 transition-colors no-underline text-white">
-                管理后台
+            {openContests.length > 0 && (
+              <Link to={`/contests/${openContests[0].id}`} className="inline-flex items-center gap-2 px-6 py-3 bg-white text-primary rounded-xl font-semibold hover:shadow-lg transition-shadow no-underline">
+                立即报名 <ArrowRight className="h-4 w-4" />
               </Link>
-            </div>
+            )}
             <div className="flex gap-8 mt-10 text-white/70 text-sm">
               <div><span className="font-bold text-white text-lg">{contests.length}</span> 场赛事</div>
               <div><span className="font-bold text-white text-lg">{contests.reduce((sum, c) => sum + getRegistrations(c.id).length, 0)}</span> 人次报名</div>

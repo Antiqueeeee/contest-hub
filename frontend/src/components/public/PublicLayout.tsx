@@ -14,7 +14,7 @@ export function PublicLayout() {
           </Link>
           <nav className="flex items-center gap-4 text-sm">
             <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">首页</Link>
-            <Link to="/admin/login" className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
+            <Link to="/admin/login" className="text-muted-foreground hover:text-foreground transition-colors text-sm">
               管理后台
             </Link>
           </nav>
