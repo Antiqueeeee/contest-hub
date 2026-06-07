@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ClipboardList, BarChart3, Settings, LogOut, ArrowRight } from 'lucide-react'
 
 export default function ContestantCenterPage() {
-  const { user, isLoggedIn, loading, logout, updateProfile } = useContestantAuth()
+  const { user, isLoggedIn, logout, updateProfile } = useContestantAuth()
   const navigate = useNavigate()
   const [registrations, setRegistrations] = useState<any[]>([])
   const [results, setResults] = useState<any[]>([])
@@ -21,7 +21,7 @@ export default function ContestantCenterPage() {
   const [activeTab, setActiveTab] = useState('registrations')
 
   useEffect(() => {
-    if (!loading && !isLoggedIn) { navigate('/login'); return }
+    if (!isLoggedIn) { navigate('/login'); return }
     if (!isLoggedIn) return
     setEditName(user?.name || '')
     setEditPhone(user?.phone || '')
@@ -33,7 +33,7 @@ export default function ContestantCenterPage() {
       setRegistrations(r.items || [])
       setResults(rs.items || [])
     }).catch(console.error).finally(() => setDataLoading(false))
-  }, [isLoggedIn, loading, navigate, user])
+  }, [isLoggedIn, navigate, user])
 
   const handleSaveProfile = async () => {
     setSaving(true)
@@ -42,7 +42,7 @@ export default function ContestantCenterPage() {
     finally { setSaving(false) }
   }
 
-  if (loading || dataLoading) return <div className="text-center py-20 text-muted-foreground">加载中...</div>
+  if (dataLoading) return <div className="text-center py-20 text-muted-foreground">加载中...</div>
   if (!isLoggedIn) return null
 
   return (

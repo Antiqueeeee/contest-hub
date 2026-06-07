@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 import { api } from '@/api/client'
 
 interface Contestant { id: number; name: string; phone: string }
@@ -29,7 +29,6 @@ interface AuthCtx {
   logout: () => void
   updateProfile: (name: string, phone: string) => Promise<void>
   isLoggedIn: boolean
-  loading: boolean
 }
 
 const AuthContext = createContext<AuthCtx | null>(null)
@@ -43,7 +42,6 @@ function loadUser(): Contestant | null {
 
 export function ContestantAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Contestant | null>(loadUser)
-  const [loading, setLoading] = useState(false)
 
   const login = useCallback(async (phone: string, password: string) => {
     const res = await api.post<{ access_token: string; user: Contestant }>('/auth/contestant/login', { phone, password })
@@ -73,7 +71,7 @@ export function ContestantAuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, updateProfile, isLoggedIn: !!user, loading }}>
+    <AuthContext.Provider value={{ user, login, register, logout, updateProfile, isLoggedIn: !!user }}>
       {children}
     </AuthContext.Provider>
   )

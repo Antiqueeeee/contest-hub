@@ -16,7 +16,7 @@ const navItems = [
 ]
 
 export function PublicLayout() {
-  const { user, isLoggedIn, logout, loading } = useContestantAuth()
+  const { user, isLoggedIn, logout } = useContestantAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -52,8 +52,7 @@ export function PublicLayout() {
           </nav>
 
           <div className="flex items-center gap-2">
-            {!loading && (
-              isLoggedIn ? (
+            {isLoggedIn ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger>
                     <span className="inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-accent transition-colors cursor-pointer">
@@ -73,7 +72,7 @@ export function PublicLayout() {
                   <span className="hidden sm:inline">登录 / 注册</span>
                 </Button>
               )
-            )}
+            }
             <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileOpen(!mobileOpen)}>
               {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
