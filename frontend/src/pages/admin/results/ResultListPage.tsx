@@ -106,8 +106,9 @@ export default function ResultListPage() {
   }
 
   const handleDownloadTemplate = async () => {
+    if (!contestId) return alert('请先选择赛事')
     const token = sessionStorage.getItem('contest_hub_token')
-    const res = await fetch('http://localhost:8000/api/admin/results/template', { headers: { Authorization: `Bearer ${token}` } })
+    const res = await fetch(`http://localhost:8000/api/admin/results/template?contest_id=${contestId}`, { headers: { Authorization: `Bearer ${token}` } })
     const blob = await res.blob()
     const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'template.xlsx'; a.click()
   }

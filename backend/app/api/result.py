@@ -41,12 +41,22 @@ async def list_results(
 
 
 @admin_router.get("/template")
-async def download_template(current_user: dict = Depends(get_current_user)):
+async def download_template(
+    contest_id: int = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
     from openpyxl import Workbook
+    from app.models.contest import Contest
+    from sqlalchemy import select as sa_select
+    r = await db.execute(sa_select(Contest).where(Contest.id == contest_id))
+    contest = r.scalar_one_or_none()
+    cats = contest.score_categories if contest and contest.score_categories else ["客观题得分", "主观题得分"]
+
     wb = Workbook()
     ws = wb.active
     ws.title = "成绩导入模板"
-    headers = ["报名编号", "客观题得分", "主观题得分", "总分", "排名", "奖项"]
+    headers = ["报名编号"] + [c for c in cats if c.strip()] + ["总分", "排名", "奖项"]
     for col, h in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=h)
     output = io.BytesIO()
@@ -70,7 +80,23 @@ async def import_results(
     wb = load_workbook(io.BytesIO(contents))
     ws = wb.active
 
-    import app.services.registration_service as reg_svc
+    # Read header row
+    headers = [str(cell.value).strip() if cell.value else "" for cell in ws[1]]
+    # Columns: 报名编号 | [score categories ...] | 总分 | 排名 | 奖项
+    # Identify score columns (between 报名编号 and 总分)
+    score_cols = []
+    total_col = -1
+    rank_col = -1
+    award_col = -1
+    for i, h in enumerate(headers):
+        if h == "总分":
+            total_col = i
+        elif h == "排名":
+            rank_col = i
+        elif h == "奖项":
+            award_col = i
+        elif h != "报名编号":
+            score_cols.append((i, h))
 
     success_count = 0
     errors = []
@@ -80,7 +106,6 @@ async def import_results(
             continue
         reg_number = str(row[0]).strip()
         try:
-            # Find registration
             from sqlalchemy import select
             from app.models.registration import Registration
             r = await db.execute(select(Registration).where(Registration.registration_number == reg_number, Registration.deleted_at.is_(None)))
@@ -90,16 +115,14 @@ async def import_results(
                 continue
 
             scores = {}
-            if len(row) > 1 and row[1] is not None:
-                scores["客观题得分"] = float(row[1])
-            if len(row) > 2 and row[2] is not None:
-                scores["主观题得分"] = float(row[2])
+            for col_idx, col_name in score_cols:
+                if len(row) > col_idx and row[col_idx] is not None:
+                    scores[col_name] = float(row[col_idx])
 
-            total = float(row[3]) if len(row) > 3 and row[3] is not None else sum(scores.values())
-            rank = int(row[4]) if len(row) > 4 and row[4] is not None else None
-            award_name = str(row[5]).strip() if len(row) > 5 and row[5] is not None else None
+            total = float(row[total_col]) if total_col >= 0 and len(row) > total_col and row[total_col] is not None else sum(scores.values())
+            rank = int(row[rank_col]) if rank_col >= 0 and len(row) > rank_col and row[rank_col] is not None else None
+            award_name = str(row[award_col]).strip() if award_col >= 0 and len(row) > award_col and row[award_col] is not None else None
 
-            # Find award_id
             award_id = None
             if award_name:
                 from app.models.contest import Award
