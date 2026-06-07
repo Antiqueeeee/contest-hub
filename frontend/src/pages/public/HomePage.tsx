@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom'
-import { newsList, contests, getRegistrations } from '@/mock/data'
+import { newsList, contests } from '@/mock/data'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Calendar, MapPin, Users, ArrowRight, Trophy, Sparkles } from 'lucide-react'
+import { Calendar, MapPin, Users, ArrowRight } from 'lucide-react'
 
 const heroGradient = { background: 'linear-gradient(135deg, hsl(243 75% 59%) 0%, hsl(271 81% 56%) 100%)' }
 
@@ -26,26 +26,19 @@ export default function HomePage() {
       <section style={heroGradient} className="text-white">
         <div className="max-w-6xl mx-auto px-6 py-16 md:py-24">
           <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 text-sm mb-5">
-              <Sparkles className="h-4 w-4" />
-              让竞赛管理更简单
-            </div>
             <h1 className="text-4xl md:text-5xl font-extrabold leading-tight mb-4">
-              专业的竞赛信息<br />发布与管理平台
+              发现并参与<br />精彩竞赛
             </h1>
             <p className="text-lg text-white/80 mb-8">
-              一站式管理赛事宣传、在线报名、成绩发布与数据导出
+              浏览赛事信息，在线报名，赛后自助查询成绩
             </p>
-            {openContests.length > 0 && (
+            {openContests.length > 0 ? (
               <Link to={`/contests/${openContests[0].id}`} className="inline-flex items-center gap-2 px-6 py-3 bg-white text-primary rounded-xl font-semibold hover:shadow-lg transition-shadow no-underline">
                 立即报名 <ArrowRight className="h-4 w-4" />
               </Link>
+            ) : (
+              <p className="text-white/60">暂无开放报名的赛事，请留意后续通知</p>
             )}
-            <div className="flex gap-8 mt-10 text-white/70 text-sm">
-              <div><span className="font-bold text-white text-lg">{contests.length}</span> 场赛事</div>
-              <div><span className="font-bold text-white text-lg">{contests.reduce((sum, c) => sum + getRegistrations(c.id).length, 0)}</span> 人次报名</div>
-              <div><span className="font-bold text-white text-lg">{publishedNews.length}</span> 篇资讯</div>
-            </div>
           </div>
         </div>
       </section>
