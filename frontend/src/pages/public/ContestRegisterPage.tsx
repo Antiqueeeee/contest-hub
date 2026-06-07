@@ -25,10 +25,10 @@ export default function ContestRegisterPage() {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
+    if (!loading && !isLoggedIn) { navigate(`/login?redirect=/contests/${id}/register`); return }
     api.get<Contest>(`/public/contests/${id}`).then(c => { setContest(c); setLoading(false) }).catch(() => setLoading(false))
-    // Auto-fill from logged in user
     if (isLoggedIn && user) { setName(user.name); setPhone(user.phone) }
-  }, [id, isLoggedIn, user])
+  }, [id, isLoggedIn, user, loading, navigate])
 
   if (loading) return <div className="text-center py-12 text-muted-foreground">加载中...</div>
   if (!contest || contest.status !== 'open') return <div className="text-center py-12"><p className="text-muted-foreground">{contest ? '该赛事当前不可报名' : '赛事不存在'}</p><Link to="/"><Button variant="link" className="mt-2">返回首页</Button></Link></div>

@@ -58,15 +58,22 @@ export default function ContestEditPage() {
       api.get<{
         title: string; description: string; location: string; start_date: string; end_date: string
         registration_start: string; registration_end: string; max_participants: number
-        groups: { id: number }[]; awards: Award[]; fields: Field[]
+        groups: { id: number; name: string }[]; awards: Award[]; fields: Field[]
       }>(`/admin/contests/${id}`).then(c => {
         setTitle(c.title); setDescription(c.description); setLocation(c.location)
-        setStartDate(c.start_date?.split('T')[0] || ''); setEndDate(c.end_date?.split('T')[0] || '')
-        setRegStart(c.registration_start?.replace('T', ' ').slice(0, 16) || '')
-        setRegEnd(c.registration_end?.replace('T', ' ').slice(0, 16) || '')
+        setStartDate(c.start_date?.split('T')[0] || '')
+        setEndDate(c.end_date?.split('T')[0] || '')
+        const rs = c.registration_start || ''
+        const re = c.registration_end || ''
+        setRegStart(rs.includes('T') ? rs.replace('T', ' ').slice(0, 16) : rs.slice(0, 16))
+        setRegEnd(re.includes('T') ? re.replace('T', ' ').slice(0, 16) : re.slice(0, 16))
         setMaxParticipants(String(c.max_participants || 0))
         setAwardsList(c.awards || [])
         setFields(c.fields || [])
+        // Map contest groups to template item IDs for checkbox selection
+        if (c.groups?.length > 0) {
+          setSelectedGroupIds(c.groups.map(g => g.id))
+        }
       }).catch(() => {})
     }
   }, [id, isNew])
