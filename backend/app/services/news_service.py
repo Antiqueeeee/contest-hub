@@ -56,7 +56,7 @@ async def list_news(
     page: int = 1,
     page_size: int = 20,
 ) -> tuple[list[News], int]:
-    query = select(News).options(joinedload(News.category))
+    query = select(News).options(joinedload(News.category), joinedload(News.author))
     count_query = select(func.count(News.id))
 
     if keyword:
@@ -87,7 +87,13 @@ async def get_news(db: AsyncSession, news_id: int) -> News:
 
 
 async def create_news(db: AsyncSession, data: NewsCreate, author_id: int) -> News:
-    news = News(author_id=author_id, **data.model_dump())
+    from datetime import datetime, timezone
+    news = News(
+        author_id=author_id,
+        status=NewsStatus.published,
+        published_at=datetime.now(timezone.utc),
+        **data.model_dump(exclude={'status'})
+    )
     db.add(news)
     await db.commit()
     await db.refresh(news)

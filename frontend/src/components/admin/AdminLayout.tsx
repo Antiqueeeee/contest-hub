@@ -14,15 +14,14 @@ const sidebarNavItems = [
   {
     label: '新闻管理', icon: Newspaper,
     children: [
-      { to: '/admin/news', label: '新闻列表' },
-      { to: '/admin/news/categories', label: '新闻分类' },
+      { to: '/admin/news/categories', label: '分类管理' },
+      { to: '/admin/news', label: '列表管理' },
     ],
   },
   {
     label: '赛事管理', icon: Flag,
     children: [
       { to: '/admin/contests', label: '赛事列表' },
-      { to: '/admin/contests/new', label: '创建赛事' },
     ],
   },
   { to: '/admin/registrations', icon: ClipboardList, label: '报名管理' },

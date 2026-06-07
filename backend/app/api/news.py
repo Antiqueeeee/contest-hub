@@ -45,7 +45,13 @@ async def list_news(
     current_user: dict = Depends(get_current_user),
 ):
     items, total = await news_service.list_news(db, keyword, category_id, status, page, page_size)
-    return {"items": [NewsOut.model_validate(n).model_dump() for n in items], "total": total, "page": page, "page_size": page_size}
+    result = []
+    for n in items:
+        d = NewsOut.model_validate(n).model_dump()
+        if n.author:
+            d['author_name'] = n.author.name
+        result.append(d)
+    return {"items": result, "total": total, "page": page, "page_size": page_size}
 
 
 @admin_router.get("/{news_id}", response_model=NewsOut)

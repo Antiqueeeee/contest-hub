@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Plus, Search, Pin, PinOff } from 'lucide-react'
 
-interface NewsItem { id: number; title: string; category_id: number; is_pinned: boolean; status: string; published_at: string | null; created_at: string }
+interface NewsItem { id: number; title: string; category_id: number; is_pinned: boolean; status: string; published_at: string | null; created_at: string; author_name?: string }
 interface Category { id: number; name: string }
 
 export default function NewsListPage() {
@@ -99,6 +99,7 @@ export default function NewsListPage() {
             <TableHead>分类</TableHead>
             <TableHead>置顶</TableHead>
             <TableHead>状态</TableHead>
+            <TableHead>发布人</TableHead>
             <TableHead>发布时间</TableHead>
             <TableHead className="text-right">操作</TableHead>
           </TableRow>
@@ -116,6 +117,7 @@ export default function NewsListPage() {
                 </Button>
               </TableCell>
               <TableCell>{statusBadge(n.status)}</TableCell>
+              <TableCell className="text-sm text-muted-foreground">{n.author_name || '-'}</TableCell>
               <TableCell className="text-muted-foreground text-sm">{n.published_at?.split('T')[0] ?? '-'}</TableCell>
               <TableCell className="text-right space-x-1">
                 <Link to={`/admin/news/${n.id}`}><Button variant="ghost" size="sm">编辑</Button></Link>
