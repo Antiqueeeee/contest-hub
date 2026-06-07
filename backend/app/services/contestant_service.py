@@ -65,7 +65,7 @@ async def update_contestant_profile(db: AsyncSession, contestant_id: int, name: 
 
 
 async def get_my_registrations(db: AsyncSession, contestant_id: int) -> list[dict]:
-    from app.models.contest import Contest
+    from app.models.contest import Contest, ContestStatus
     result = await db.execute(
         select(Registration).where(Registration.contestant_id == contestant_id, Registration.deleted_at.is_(None))
         .order_by(Registration.submitted_at.desc())
@@ -75,14 +75,47 @@ async def get_my_registrations(db: AsyncSession, contestant_id: int) -> list[dic
     for reg in regs:
         ct = await db.execute(select(Contest).where(Contest.id == reg.contest_id))
         contest = ct.scalar_one_or_none()
-        output.append({
+
+        # Check for result
+        rr = await db.execute(select(Result).where(Result.registration_id == reg.id, Result.is_published == True))
+        result_row = rr.scalar_one_or_none()
+
+        status_labels = {
+            ContestStatus.open: "报名中",
+            ContestStatus.ongoing: "进行中",
+            ContestStatus.finished: "已结束",
+            ContestStatus.draft: "未发布",
+            ContestStatus.cancelled: "已取消",
+        }
+
+        item = {
             "id": reg.id,
             "registration_number": reg.registration_number,
             "contest_id": reg.contest_id,
             "contest_title": contest.title if contest else "未知赛事",
+            "contest_status": contest.status.value if contest else "unknown",
+            "contest_status_label": status_labels.get(contest.status, contest.status.value) if contest else "未知",
             "form_data": reg.form_data,
             "submitted_at": reg.submitted_at.isoformat() if reg.submitted_at else None,
-        })
+        }
+
+        if result_row:
+            award_name = ""
+            if result_row.award_id:
+                from app.models.contest import Award
+                a = await db.execute(select(Award).where(Award.id == result_row.award_id))
+                award = a.scalar_one_or_none()
+                if award: award_name = award.name
+            item["result"] = {
+                "total_score": float(result_row.total_score),
+                "rank": result_row.rank,
+                "award_name": award_name,
+                "scores": result_row.scores,
+            }
+        else:
+            item["result"] = None
+
+        output.append(item)
     return output
 
 
