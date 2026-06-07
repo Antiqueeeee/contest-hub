@@ -41,6 +41,7 @@ class ContestGroup(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     contest_id: Mapped[int | None] = mapped_column(ForeignKey("contests.id", ondelete="SET NULL"), nullable=True)
+    template_item_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     max_participants: Mapped[int] = mapped_column(Integer, default=0)

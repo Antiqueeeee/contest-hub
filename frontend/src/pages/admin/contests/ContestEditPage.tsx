@@ -58,7 +58,7 @@ export default function ContestEditPage() {
       api.get<{
         title: string; description: string; location: string; start_date: string; end_date: string
         registration_start: string; registration_end: string; max_participants: number
-        groups: { id: number; name: string }[]; awards: Award[]; fields: Field[]
+        groups: { id: number; name: string; template_item_id: number }[]; awards: Award[]; fields: Field[]
       }>(`/admin/contests/${id}`).then(c => {
         setTitle(c.title); setDescription(c.description); setLocation(c.location)
         setStartDate(c.start_date?.split('T')[0] || '')
@@ -72,7 +72,7 @@ export default function ContestEditPage() {
         setFields(c.fields || [])
         // Map contest groups to template item IDs for checkbox selection
         if (c.groups?.length > 0) {
-          setSelectedGroupIds(c.groups.map(g => g.id))
+          setSelectedGroupIds(c.groups.map(g => g.template_item_id || g.id))
         }
       }).catch(() => {})
     }
@@ -95,12 +95,11 @@ export default function ContestEditPage() {
         registration_start: regStart, registration_end: regEnd,
         max_participants: Number(maxParticipants),
         groups: selectedGroupIds.map((gid, i) => {
-          // Find the item in templates
           for (const t of templates) {
             const item = t.items.find(it => it.id === gid)
-            if (item) return { name: item.name, description: item.description, max_participants: item.max_participants, sort_order: i + 1 }
+            if (item) return { name: item.name, description: item.description, max_participants: item.max_participants, sort_order: i + 1, template_item_id: item.id }
           }
-          return { name: `组别${gid}`, description: '', max_participants: 0, sort_order: i + 1 }
+          return { name: `组别${gid}`, description: '', max_participants: 0, sort_order: i + 1, template_item_id: gid }
         }),
         awards: awardsList.filter(a => a.name),
         fields: fields.filter(f => f.field_name),

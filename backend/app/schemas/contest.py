@@ -11,7 +11,8 @@ class ContestGroupIn(BaseModel):
 
 class ContestGroupOut(BaseModel):
     id: int
-    contest_id: int
+    contest_id: int | None = None
+    template_item_id: int | None = None
     name: str
     description: str
     max_participants: int
