@@ -44,9 +44,9 @@ export default function RegisterPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1.5"><Label>手机号 <span className="text-destructive">*</span></Label><Input value={phone} onChange={e => { setPhone(e.target.value); setError('') }} placeholder="将作为登录账号" maxLength={11} className="h-10" /></div>
-            <div className="space-y-1.5"><Label>姓名 <span className="text-destructive">*</span></Label><Input value={name} onChange={e => { setName(e.target.value); setError('') }} placeholder="请输入真实姓名" maxLength={20} className="h-10" /></div>
-            <div className="space-y-1.5"><Label>密码 <span className="text-destructive">*</span></Label><Input type="password" value={password} onChange={e => { setPassword(e.target.value); setError('') }} placeholder="6-20位密码" className="h-10" /></div>
+            <div className="space-y-1.5"><Label>手机号（登录账号）<span className="text-destructive">*</span></Label><Input value={phone} onChange={e => { setPhone(e.target.value); setError('') }} placeholder="用于登录和接收通知" maxLength={11} className="h-10" /></div>
+            <div className="space-y-1.5"><Label>真实姓名（显示名称）<span className="text-destructive">*</span></Label><Input value={name} onChange={e => { setName(e.target.value); setError('') }} placeholder="报名和成绩单上显示的名称" maxLength={20} className="h-10" /></div>
+            <div className="space-y-1.5"><Label>登录密码 <span className="text-destructive">*</span></Label><Input type="password" value={password} onChange={e => { setPassword(e.target.value); setError('') }} placeholder="6-20位" className="h-10" /></div>
             {error && <p className="text-sm text-destructive bg-destructive/10 p-2.5 rounded-lg">{error}</p>}
             <Button type="submit" className="w-full h-10 border-0" style={bgGradient} disabled={submitting}>{submitting ? '注册中...' : '注册'}</Button>
             <p className="text-xs text-muted-foreground text-center">已有账号？<Link to="/login" className="text-primary hover:underline">立即登录</Link></p>
