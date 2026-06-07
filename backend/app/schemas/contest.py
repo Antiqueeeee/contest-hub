@@ -7,6 +7,7 @@ class ContestGroupIn(BaseModel):
     description: str = ""
     max_participants: int = 0
     sort_order: int = 0
+    template_item_id: int | None = None
 
 
 class ContestGroupOut(BaseModel):
