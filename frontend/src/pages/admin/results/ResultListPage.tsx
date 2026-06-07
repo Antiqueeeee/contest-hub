@@ -35,13 +35,21 @@ export default function ResultListPage() {
   useEffect(() => {
     if (!contestId) { setRegistrations([]); setResults([]); return }
     setLoading(true)
-    Promise.all([
-      api.get<{ items: RegItem[] }>(`/admin/registrations?contest_id=${contestId}&page_size=200`),
-      api.get<{ items: ResultItem[] }>(`/admin/results?contest_id=${contestId}&page_size=200`),
-    ]).then(([regRes, resRes]) => {
-      setRegistrations(regRes.items || [])
-      setResults(resRes.items || [])
-    }).catch(console.error).finally(() => setLoading(false))
+    const load = async () => {
+      try {
+        const [regRes, resRes] = await Promise.all([
+          api.get<{ items: RegItem[] }>(`/admin/registrations?contest_id=${contestId}&page_size=200`),
+          api.get<{ items: ResultItem[] }>(`/admin/results?contest_id=${contestId}&page_size=200`),
+        ])
+        setRegistrations(Array.isArray(regRes.items) ? regRes.items : [])
+        setResults(Array.isArray(resRes.items) ? resRes.items : [])
+      } catch (e) {
+        console.error('Failed to load contest data:', e)
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
   }, [contestId])
 
   const getResultForReg = (regId: number) => results.find(r => r.registration_id === regId)
