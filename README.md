@@ -63,7 +63,7 @@ docker run -d \
 cd backend
 pip install -r requirements.txt
 python seed.py              # 创建管理员账号
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+PYTHONPATH=backend uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ### 3. 启动前端
