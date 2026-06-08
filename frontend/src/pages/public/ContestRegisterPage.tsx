@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { api } from '@/api/client'
-import { useContestantAuth, getCToken } from '@/hooks/useContestantAuth'
+import { useContestantAuth, getCToken, contestantApi } from '@/hooks/useContestantAuth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -17,7 +17,7 @@ export default function ContestRegisterPage() {
   const { user, isLoggedIn } = useContestantAuth()
   const [contest, setContest] = useState<Contest | null>(null)
   const [loading, setLoading] = useState(true)
-  const [name, setName] = useState(''); const [phone, setPhone] = useState(''); const [groupId, setGroupId] = useState('')
+  const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [idNumber, setIdNumber] = useState(''); const [organization, setOrganization] = useState(''); const [groupId, setGroupId] = useState('')
   const [customValues, setCustomValues] = useState<Record<number, string>>({})
   const [privacyAgreed, setPrivacyAgreed] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -26,7 +26,17 @@ export default function ContestRegisterPage() {
   useEffect(() => {
     if (!loading && !isLoggedIn) { navigate(`/login?redirect=/contests/${id}/register`); return }
     api.get<Contest>(`/public/contests/${id}`).then(c => { setContest(c); setLoading(false) }).catch(() => setLoading(false))
-    if (isLoggedIn && user) { setName(user.name); setPhone(user.phone) }
+    if (isLoggedIn && user) {
+      setName(user.name); setEmail(user.email)
+      // Fetch latest profile to ensure id_number is available (handles stale sessionStorage)
+      const ca = contestantApi()
+      ca.get<any>('/contestant/profile').then(p => {
+        setIdNumber(p.id_number || ''); setOrganization(p.organization || '')
+      }).catch(() => {
+        // Fallback to sessionStorage data
+        setIdNumber(user.id_number || ''); setOrganization(user.organization || '')
+      })
+    }
   }, [id, isLoggedIn, user, loading, navigate])
 
   if (loading) return <div className="text-center py-12 text-muted-foreground">加载中...</div>
@@ -35,7 +45,8 @@ export default function ContestRegisterPage() {
   const validate = () => {
     const e: Record<string, string> = {}
     if (!name || name.length < 2 || name.length > 20) e.name = '请输入 2-20 位的真实姓名'
-    if (!phone || !/^1\d{10}$/.test(phone)) e.phone = '请输入正确的 11 位手机号'
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = '请输入正确的邮箱地址'
+    if (!idNumber || !/^\d{17}[\dXx]$/.test(idNumber)) e.idNumber = '请输入正确的18位身份证号'
     if (!privacyAgreed) e.privacy = '请阅读并同意隐私政策'
     contest.fields?.filter(f => f.is_required).forEach(f => { if (!customValues[f.id]?.trim()) e[`f${f.id}`] = `请填写${f.field_name}` })
     setErrors(e); return Object.keys(e).length === 0
@@ -51,7 +62,7 @@ export default function ContestRegisterPage() {
       if (token) headers['Authorization'] = `Bearer ${token}`
       const res = await fetch(`http://localhost:8000/api/public/contests/${contest.id}/register`, {
         method: 'POST', headers,
-        body: JSON.stringify({ contest_id: contest.id, group_id: groupId ? Number(groupId) : null, name, phone, custom_fields: cf, privacy_agreed: privacyAgreed }),
+        body: JSON.stringify({ contest_id: contest.id, group_id: groupId ? Number(groupId) : null, name, email, id_number: idNumber, organization: organization || null, custom_fields: cf, privacy_agreed: privacyAgreed }),
       }).then(r => r.ok ? r.json() : r.json().then(e => { throw new Error(e.detail || '报名失败') }))
       navigate(`/contests/${contest.id}/register/success`, { state: { registrationNumber: res.registration_number, contestTitle: contest.title, name } })
     } catch (e) { alert(e instanceof Error ? e.message : '报名失败') }
@@ -71,7 +82,9 @@ export default function ContestRegisterPage() {
             </div>
           )}
           <div className="space-y-1"><Label>姓名 <span className="text-destructive">*</span></Label><Input value={name} onChange={e => { setName(e.target.value); setErrors({}) }} placeholder="请输入真实姓名" disabled={isLoggedIn} />{errors.name && <p className="text-sm text-destructive">{errors.name}</p>}</div>
-          <div className="space-y-1"><Label>手机号 <span className="text-destructive">*</span></Label><Input value={phone} onChange={e => { setPhone(e.target.value); setErrors({}) }} placeholder="请输入 11 位手机号" maxLength={11} disabled={isLoggedIn} />{errors.phone && <p className="text-sm text-destructive">{errors.phone}</p>}</div>
+          <div className="space-y-1"><Label>邮箱 <span className="text-destructive">*</span></Label><Input value={email} onChange={e => { setEmail(e.target.value); setErrors({}) }} placeholder="请输入邮箱地址" disabled={isLoggedIn} />{errors.email && <p className="text-sm text-destructive">{errors.email}</p>}</div>
+          <div className="space-y-1"><Label>身份证号 <span className="text-destructive">*</span></Label><Input value={idNumber} onChange={e => { setIdNumber(e.target.value); setErrors({}) }} placeholder="18位身份证号码" maxLength={18} disabled={isLoggedIn} />{errors.idNumber && <p className="text-sm text-destructive">{errors.idNumber}</p>}</div>
+          <div className="space-y-1"><Label>学校/单位</Label><Input value={organization} onChange={e => { setOrganization(e.target.value); setErrors({}) }} placeholder="选填" maxLength={200} /></div>
           {contest.groups?.length > 0 && (
             <div className="space-y-1"><Label>参赛组别</Label>
               <select value={groupId} onChange={e => { setGroupId(e.target.value); setErrors({}) }} className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">

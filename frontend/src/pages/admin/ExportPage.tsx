@@ -6,30 +6,55 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Download } from 'lucide-react'
 
-interface Contest { id: number; title: string }
+interface Contest { id: number; title: string; score_categories: string[] | null }
 
 const selectCls = "w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+
+const REG_DEFAULTS = ['registration_number', 'name', 'email', 'id_number', 'organization', 'submitted_at']
 
 export default function ExportPage() {
   const [exportType, setExportType] = useState<'registration' | 'result'>('registration')
   const [contestId, setContestId] = useState('')
   const [contests, setContests] = useState<Contest[]>([])
-  const [selectedFields, setSelectedFields] = useState<string[]>(['registration_number', 'name', 'phone', 'submitted_at'])
+  const [scoreCats, setScoreCats] = useState<string[]>([])
+  const [selectedFields, setSelectedFields] = useState<string[]>([...REG_DEFAULTS])
   const [exporting, setExporting] = useState(false)
 
   useEffect(() => { api.get<{ items: Contest[] }>('/admin/contests').then(r => setContests(r.items)).catch(console.error) }, [])
 
+  // Fetch contest details to get score_categories
+  useEffect(() => {
+    if (!contestId) { setScoreCats([]); return }
+    api.get<Contest>(`/admin/contests/${contestId}`).then(c => {
+      setScoreCats((c.score_categories || []).filter(s => s.trim()))
+    }).catch(() => setScoreCats([]))
+  }, [contestId])
+
   const regFields = [
     { key: 'registration_number', label: '报名编号' }, { key: 'name', label: '姓名' },
-    { key: 'phone', label: '手机号' }, { key: 'submitted_at', label: '报名时间' },
+    { key: 'email', label: '邮箱' }, { key: 'id_number', label: '身份证号' },
+    { key: 'organization', label: '学校/单位' }, { key: 'submitted_at', label: '报名时间' },
   ]
-  const resultFields = [
+  const baseResultFields = [
     { key: 'registration_number', label: '报名编号' }, { key: 'name', label: '姓名' },
-    { key: 'phone', label: '手机号' }, { key: 'total_score', label: '总分' },
-    { key: 'rank', label: '排名' }, { key: 'award', label: '奖项' },
   ]
+  const tailResultFields = [
+    { key: 'total_score', label: '总分' }, { key: 'rank', label: '排名' }, { key: 'award', label: '奖项' },
+  ]
+  const scoreFields = scoreCats.map(c => ({ key: c, label: c }))
+  const resultFields = [...baseResultFields, ...scoreFields, ...tailResultFields]
 
   const fields = exportType === 'registration' ? regFields : resultFields
+
+  // Auto-select defaults when type/contest/scoreCats changes
+  const handleTypeChange = (t: 'registration' | 'result') => {
+    setExportType(t)
+    if (t === 'registration') {
+      setSelectedFields([...REG_DEFAULTS])
+    } else {
+      setSelectedFields(['registration_number', 'name', ...scoreCats.filter(s => s.trim()), 'total_score', 'rank', 'award'])
+    }
+  }
 
   const handleExport = async () => {
     if (!contestId) return alert('请选择赛事')
@@ -61,7 +86,7 @@ export default function ExportPage() {
         <CardContent className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <Label>导出类型</Label>
-            <select value={exportType} onChange={e => { setExportType(e.target.value as 'registration' | 'result'); setSelectedFields([]) }} className={selectCls}>
+            <select value={exportType} onChange={e => handleTypeChange(e.target.value as 'registration' | 'result')} className={selectCls}>
               <option value="registration">报名数据</option>
               <option value="result">成绩数据</option>
             </select>

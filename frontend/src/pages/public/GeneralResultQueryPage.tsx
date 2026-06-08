@@ -13,7 +13,7 @@ export default function GeneralResultQueryPage() {
   const [contests, setContests] = useState<Contest[]>([])
   const [contestId, setContestId] = useState('')
   const [regNumber, setRegNumber] = useState('')
-  const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
   const [found, setFound] = useState<any>(null)
   const [queried, setQueried] = useState(false)
   const [querying, setQuerying] = useState(false)
@@ -28,10 +28,10 @@ export default function GeneralResultQueryPage() {
   const handleQuery = async () => {
     setError(''); setQueried(true)
     if (!contestId) { setError('请选择赛事'); return }
-    if (!regNumber.trim() || !phone.trim()) { setError('请输入报名编号和手机号'); return }
+    if (!regNumber.trim() || !email.trim()) { setError('请输入报名编号和邮箱'); return }
     setQuerying(true)
     try {
-      const res = await api.post<any>(`/public/contests/${contestId}/query-result`, { registration_number: regNumber, phone })
+      const res = await api.post<any>(`/public/contests/${contestId}/query-result`, { registration_number: regNumber, email })
       setFound(res)
     } catch { setFound(null) }
     finally { setQuerying(false) }
@@ -50,7 +50,7 @@ export default function GeneralResultQueryPage() {
             </select>
           </div>
           <div className="space-y-1"><Label>报名编号</Label><Input value={regNumber} onChange={e => { setRegNumber(e.target.value); setQueried(false) }} placeholder="请输入报名编号" /></div>
-          <div className="space-y-1"><Label>手机号</Label><Input value={phone} onChange={e => { setPhone(e.target.value); setQueried(false) }} placeholder="请输入报名时填写的手机号" maxLength={11} /></div>
+          <div className="space-y-1"><Label>邮箱</Label><Input value={email} onChange={e => { setEmail(e.target.value); setQueried(false) }} placeholder="请输入报名时填写的邮箱" /></div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button className="w-full" onClick={handleQuery} disabled={querying}><Search className="h-4 w-4 mr-1" />{querying ? '查询中...' : '查询成绩'}</Button>
           {queried && found && (

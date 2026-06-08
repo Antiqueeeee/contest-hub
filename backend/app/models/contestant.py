@@ -8,7 +8,9 @@ class Contestant(Base):
     __tablename__ = "contestants"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    phone: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     name: Mapped[str] = mapped_column(String(50), nullable=False)
+    id_number: Mapped[str] = mapped_column(String(18), nullable=False)
+    organization: Mapped[str | None] = mapped_column(String(200), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

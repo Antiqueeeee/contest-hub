@@ -10,7 +10,7 @@ import { Trophy } from 'lucide-react'
 const bgGradient = { background: 'linear-gradient(135deg, hsl(243 75% 59%), hsl(271 81% 56%))' }
 
 export default function LoginPage() {
-  const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -23,7 +23,7 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setSubmitting(true); setError('')
-    try { await login(phone, password); navigate('/') }
+    try { await login(email, password); navigate('/') }
     catch (err: any) { setError(err instanceof Error ? err.message : (err.json ? (await err.json()).detail : '登录失败')) }
     finally { setSubmitting(false) }
   }
@@ -42,7 +42,7 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1.5"><Label>手机号</Label><Input value={phone} onChange={e => { setPhone(e.target.value); setError('') }} placeholder="请输入注册手机号" maxLength={11} className="h-10" /></div>
+            <div className="space-y-1.5"><Label>邮箱</Label><Input value={email} onChange={e => { setEmail(e.target.value); setError('') }} placeholder="请输入注册邮箱" className="h-10" /></div>
             <div className="space-y-1.5"><Label>密码</Label><Input type="password" value={password} onChange={e => { setPassword(e.target.value); setError('') }} placeholder="请输入密码" className="h-10" /></div>
             {error && <p className="text-sm text-destructive bg-destructive/10 p-2.5 rounded-lg">{error}</p>}
             <Button type="submit" className="w-full h-10 border-0" style={bgGradient} disabled={submitting}>{submitting ? '登录中...' : '登录'}</Button>

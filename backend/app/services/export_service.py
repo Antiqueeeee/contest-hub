@@ -14,7 +14,9 @@ from app.services.result_service import list_results
 FIELD_LABELS = {
     "registration_number": "报名编号",
     "name": "姓名",
-    "phone": "手机号",
+    "email": "邮箱",
+    "id_number": "身份证号",
+    "organization": "学校/单位",
     "group_id": "组别",
     "group": "组别",
     "submitted_at": "报名时间",
@@ -43,17 +45,27 @@ async def submit_export_task(
 ) -> str:
     settings = get_settings()
     task_id = str(uuid.uuid4())[:8]
-    _export_tasks[task_id] = {"status": "processing", "file_path": None, "created_at": datetime.now(timezone.utc)}
+
+    # Get contest title for filename
+    from app.models.contest import Contest
+    from sqlalchemy import select as sa_select
+    ct = await db.execute(sa_select(Contest).where(Contest.id == contest_id))
+    contest = ct.scalar_one_or_none()
+    contest_title = contest.title.replace('/', '_').replace('\\', '_') if contest else f"赛事{contest_id}"
+    type_label = "报名数据" if export_type == "registration" else "成绩数据"
+    download_filename = f"{contest_title}_{type_label}.xlsx"
+
+    _export_tasks[task_id] = {"status": "processing", "file_path": None, "created_at": datetime.now(timezone.utc), "filename": download_filename}
 
     try:
         wb = Workbook()
         ws = wb.active
-        ws.title = "报名数据" if export_type == "registration" else "成绩数据"
+        ws.title = type_label
 
         if export_type == "registration":
             rows = await get_registrations_for_export(db, contest_id, group_ids)
             if not field_names:
-                field_names = ["registration_number", "name", "phone", "group_id", "submitted_at"]
+                field_names = ["registration_number", "name", "email", "id_number", "organization", "group_id", "submitted_at"]
 
             # Header
             for col, name in enumerate(field_names, 1):
@@ -71,8 +83,12 @@ async def submit_export_task(
                         val = reg.registration_number
                     elif name == "name":
                         val = form_data.get("name", "")
-                    elif name == "phone":
-                        val = form_data.get("phone", "")
+                    elif name == "email":
+                        val = form_data.get("email", "")
+                    elif name == "id_number":
+                        val = form_data.get("id_number", "")
+                    elif name == "organization":
+                        val = form_data.get("organization", "")
                     elif name == "group_id":
                         val = str(reg.group_id) if reg.group_id else ""
                     elif name == "submitted_at":
@@ -85,8 +101,11 @@ async def submit_export_task(
 
         else:  # result
             items, _ = await list_results(db, contest_id=contest_id, page=1, page_size=settings.export_max_rows)
+            # Get contest score categories for dynamic columns
+            score_cats = contest.score_categories if contest and contest.score_categories else []
+            score_cats = [c for c in score_cats if c.strip()]
             if not field_names:
-                field_names = ["registration_number", "name", "phone", "group", "total_score", "rank", "award"]
+                field_names = ["registration_number", "name"] + score_cats + ["total_score", "rank", "award"]
 
             for col, name in enumerate(field_names, 1):
                 label = FIELD_LABELS.get(name, name)
@@ -110,10 +129,12 @@ async def submit_export_task(
                             val = r.registration.registration_number if r.registration else ''
                     elif name == "name":
                         val = form_data.get("name", "")
-                    elif name == "phone":
-                        val = form_data.get("phone", "")
-                    elif name == "group":
-                        val = ""
+                    elif name == "email":
+                        val = form_data.get("email", "")
+                    elif name == "id_number":
+                        val = form_data.get("id_number", "")
+                    elif name == "organization":
+                        val = form_data.get("organization", "")
                     elif name == "total_score":
                         val = str(r.total_score)
                     elif name == "rank":

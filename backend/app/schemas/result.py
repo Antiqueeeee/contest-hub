@@ -43,7 +43,7 @@ class ResultListOut(BaseModel):
 
 class ResultQueryRequest(BaseModel):
     registration_number: str
-    phone: str = Field(pattern=r"^1\d{10}$")
+    email: str
 
 
 class ResultQueryOut(BaseModel):

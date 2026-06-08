@@ -16,7 +16,7 @@ async def get_current_contestant(credentials: HTTPAuthorizationCredentials = Dep
         user_id_str = payload.get("sub")
         if not user_id_str:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="无效的认证令牌")
-        return {"contestant_id": int(user_id_str), "phone": payload.get("phone", "")}
+        return {"contestant_id": int(user_id_str), "email": payload.get("email", "")}
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="无效的认证令牌")
 
@@ -32,6 +32,6 @@ async def get_optional_contestant(credentials: HTTPAuthorizationCredentials | No
         payload = jwt.decode(credentials.credentials, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
         if payload.get("type") != "contestant":
             return None
-        return {"contestant_id": int(payload.get("sub")), "phone": payload.get("phone", "")}
+        return {"contestant_id": int(payload.get("sub")), "email": payload.get("email", "")}
     except JWTError:
         return None

@@ -85,8 +85,12 @@ async def download_template(
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
+    from urllib.parse import quote
+    safe_title = contest.title.replace('/', '_').replace('\\', '_') if contest else f"赛事{contest_id}"
+    filename = f"{safe_title}_成绩导入模板.xlsx"
+    encoded = quote(filename)
     return StreamingResponse(output, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                             headers={"Content-Disposition": "attachment; filename=result_template.xlsx"})
+                             headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded}"})
 
 
 @admin_router.post("/import")
@@ -188,7 +192,7 @@ async def withdraw_result(result_id: int, db: AsyncSession = Depends(get_db), cu
 
 @public_router.post("/{contest_id}/query-result")
 async def query_result(contest_id: int, data: ResultQueryRequest, db: AsyncSession = Depends(get_db)):
-    result = await result_service.query_result_public(db, contest_id, data.registration_number, data.phone)
+    result = await result_service.query_result_public(db, contest_id, data.registration_number, data.email)
     if not result:
         raise HTTPException(status_code=404, detail="未查询到成绩，请检查报名编号和手机号是否正确")
     return result

@@ -38,7 +38,11 @@ export default function RegistrationListPage() {
     fetchData()
   }
 
-  const maskPhone = (phone: string) => phone ? phone.slice(0, 3) + '****' + phone.slice(7) : '-'
+  const maskEmail = (email: string) => {
+    if (!email) return '-'
+    const [name, domain] = email.split('@')
+    return name.slice(0, 2) + '***@' + (domain || '')
+  }
 
   if (loading) return <div className="text-center py-12 text-muted-foreground">加载中...</div>
 
@@ -53,13 +57,13 @@ export default function RegistrationListPage() {
         </select>
       </div>
       <Table>
-        <TableHeader><TableRow><TableHead>报名编号</TableHead><TableHead>姓名</TableHead><TableHead>手机号</TableHead><TableHead>报名时间</TableHead><TableHead className="text-right">操作</TableHead></TableRow></TableHeader>
+        <TableHeader><TableRow><TableHead>报名编号</TableHead><TableHead>姓名</TableHead><TableHead>邮箱</TableHead><TableHead>报名时间</TableHead><TableHead className="text-right">操作</TableHead></TableRow></TableHeader>
         <TableBody>
           {items.map(r => (
             <TableRow key={r.id}>
               <TableCell className="font-mono text-sm">{r.registration_number}</TableCell>
               <TableCell>{r.form_data?.name ?? '-'}</TableCell>
-              <TableCell>{maskPhone(r.form_data?.phone ?? '')}</TableCell>
+              <TableCell>{maskEmail(r.form_data?.email ?? '')}</TableCell>
               <TableCell className="text-sm text-muted-foreground">{r.submitted_at?.split('.')[0]}</TableCell>
               <TableCell className="text-right space-x-1">
                 <Button variant="ghost" size="sm" onClick={() => setDetail(r)}><Eye className="h-3 w-3" /></Button>

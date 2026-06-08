@@ -223,7 +223,7 @@ export default function ContestEditPage() {
           <Button variant="outline" size="sm" onClick={addField}><Plus className="h-3 w-3 mr-1" />添加字段</Button>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">默认字段：姓名、手机号（无需添加）</p>
+          <p className="text-sm text-muted-foreground">默认字段：姓名、邮箱、身份证号（无需添加）</p>
           {fields.map((f, i) => (
             <div key={i} className="flex items-start gap-3 p-3 border rounded-lg">
               <div className="flex-1 grid grid-cols-4 gap-3">

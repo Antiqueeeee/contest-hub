@@ -79,5 +79,6 @@ async def download_export(task_id: str, current_user: dict = Depends(get_current
         raise HTTPException(status_code=404, detail="文件不存在或尚未生成完成")
     if not task.get("file_path"):
         raise HTTPException(status_code=404, detail="文件不存在")
-    return FileResponse(task["file_path"], filename=f"export_{task_id}.xlsx",
+    filename = task.get("filename", f"export_{task_id}.xlsx")
+    return FileResponse(task["file_path"], filename=filename,
                         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

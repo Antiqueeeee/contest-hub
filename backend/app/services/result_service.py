@@ -111,8 +111,8 @@ async def withdraw_result(db: AsyncSession, result_id: int) -> Result:
     return r
 
 
-async def query_result_public(db: AsyncSession, contest_id: int, registration_number: str, phone: str) -> dict | None:
-    if not registration_number.strip() or not phone.strip():
+async def query_result_public(db: AsyncSession, contest_id: int, registration_number: str, email: str) -> dict | None:
+    if not registration_number.strip() or not email.strip():
         return None
 
     reg_result = await db.execute(
@@ -125,7 +125,7 @@ async def query_result_public(db: AsyncSession, contest_id: int, registration_nu
     reg = reg_result.scalar_one_or_none()
     if not reg:
         return None
-    if reg.form_data.get("phone") != phone.strip():
+    if reg.form_data.get("email") != email.strip():
         return None
 
     result_result = await db.execute(

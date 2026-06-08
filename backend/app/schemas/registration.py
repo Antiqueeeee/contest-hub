@@ -6,7 +6,9 @@ class RegistrationCreate(BaseModel):
     contest_id: int
     group_id: int | None = None
     name: str = Field(min_length=2, max_length=20)
-    phone: str = Field(pattern=r"^1\d{10}$")
+    email: str = Field(max_length=255)
+    id_number: str = Field(min_length=18, max_length=18)
+    organization: str | None = Field(default=None, max_length=200)
     custom_fields: dict[str, str] = {}
     privacy_agreed: bool = True
 

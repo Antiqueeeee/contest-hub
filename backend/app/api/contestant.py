@@ -9,41 +9,44 @@ router = APIRouter(prefix="/api", tags=["选手"])
 
 
 class ContestantRegister(BaseModel):
-    phone: str = Field(pattern=r"^1\d{10}$")
+    email: str = Field(max_length=255)
     password: str = Field(min_length=6, max_length=20)
     name: str = Field(min_length=2, max_length=20)
+    id_number: str = Field(min_length=18, max_length=18)
+    organization: str | None = Field(default=None, max_length=200)
 
 
 class ContestantLogin(BaseModel):
-    phone: str
+    email: str
     password: str
 
 
 class ContestantProfileUpdate(BaseModel):
     name: str | None = None
-    phone: str | None = None
+    email: str | None = None
+    organization: str | None = None
 
 
 @router.post("/auth/contestant/register")
 async def register(data: ContestantRegister, db: AsyncSession = Depends(get_db)):
-    return await contestant_service.register_contestant(db, data.phone, data.password, data.name)
+    return await contestant_service.register_contestant(db, data.email, data.password, data.name, data.id_number, data.organization)
 
 
 @router.post("/auth/contestant/login")
 async def login(data: ContestantLogin, db: AsyncSession = Depends(get_db)):
-    return await contestant_service.login_contestant(db, data.phone, data.password)
+    return await contestant_service.login_contestant(db, data.email, data.password)
 
 
 @router.get("/contestant/profile")
 async def get_profile(current: dict = Depends(get_current_contestant), db: AsyncSession = Depends(get_db)):
     c = await contestant_service.get_contestant_profile(db, current["contestant_id"])
-    return {"id": c.id, "name": c.name, "phone": c.phone}
+    return {"id": c.id, "name": c.name, "email": c.email, "id_number": c.id_number, "organization": c.organization}
 
 
 @router.put("/contestant/profile")
 async def update_profile(data: ContestantProfileUpdate, current: dict = Depends(get_current_contestant), db: AsyncSession = Depends(get_db)):
-    c = await contestant_service.update_contestant_profile(db, current["contestant_id"], data.name, data.phone)
-    return {"id": c.id, "name": c.name, "phone": c.phone}
+    c = await contestant_service.update_contestant_profile(db, current["contestant_id"], data.name, data.email, data.organization)
+    return {"id": c.id, "name": c.name, "email": c.email, "id_number": c.id_number, "organization": c.organization}
 
 
 @router.get("/contestant/registrations")

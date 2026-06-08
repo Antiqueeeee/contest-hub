@@ -147,7 +147,7 @@ export default function ResultListPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">成绩管理</h1>
         <div className="space-x-2">
-          <Button variant="outline" size="sm" onClick={handleDownloadTemplate}><Download className="h-4 w-4 mr-1" />下载导入模板</Button>
+          <Button variant="outline" size="sm" onClick={handleDownloadTemplate}><Download className="h-4 w-4 mr-1" />下载参赛者名单</Button>
           <Button variant="outline" size="sm" onClick={handleImport}><Upload className="h-4 w-4 mr-1" />批量导入Excel</Button>
         </div>
       </div>
@@ -184,7 +184,7 @@ export default function ResultListPage() {
             <TableRow>
               <TableHead>报名编号</TableHead>
               <TableHead>姓名</TableHead>
-              <TableHead>手机号</TableHead>
+              <TableHead>邮箱</TableHead>
               <TableHead>总分</TableHead>
               <TableHead>排名</TableHead>
               <TableHead>状态</TableHead>
@@ -198,7 +198,7 @@ export default function ResultListPage() {
                 <TableRow key={reg.id}>
                   <TableCell className="font-mono text-sm">{reg.registration_number}</TableCell>
                   <TableCell>{reg.form_data?.name || '-'}</TableCell>
-                  <TableCell className="text-muted-foreground">{reg.form_data?.phone?.slice(0, 3) + '****' + (reg.form_data?.phone?.slice(7) || '')}</TableCell>
+                  <TableCell className="text-muted-foreground">{(() => { const e = reg.form_data?.email; if (!e) return '-'; const [n, d] = e.split('@'); return n.slice(0, 2) + '***@' + (d || ''); })()}</TableCell>
                   <TableCell className="font-bold">{result?.total_score ?? <span className="text-muted-foreground">-</span>}</TableCell>
                   <TableCell>{result?.rank ?? '-'}</TableCell>
                   <TableCell>

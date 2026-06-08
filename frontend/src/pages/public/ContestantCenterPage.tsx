@@ -15,15 +15,19 @@ export default function ContestantCenterPage() {
   const [records, setRecords] = useState<any[]>([])
   const [dataLoading, setDataLoading] = useState(true)
   const [editName, setEditName] = useState('')
-  const [editPhone, setEditPhone] = useState('')
+  const [editEmail, setEditEmail] = useState('')
+  const [editOrganization, setEditOrganization] = useState('')
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState('records')
 
   useEffect(() => {
     if (!isLoggedIn) { navigate('/login'); return }
     setEditName(user?.name || '')
-    setEditPhone(user?.phone || '')
+    setEditEmail(user?.email || '')
     const ca = contestantApi()
+    ca.get<any>('/contestant/profile').then(p => {
+      setEditOrganization(p.organization || '')
+    }).catch(() => {})
     ca.get<any>('/contestant/registrations').then(r => {
       setRecords(r.items || [])
     }).catch(console.error).finally(() => setDataLoading(false))
@@ -31,7 +35,7 @@ export default function ContestantCenterPage() {
 
   const handleSaveProfile = async () => {
     setSaving(true)
-    try { await updateProfile(editName, editPhone) }
+    try { await updateProfile(editName, editEmail, editOrganization) }
     catch { alert('保存失败') }
     finally { setSaving(false) }
   }
@@ -55,7 +59,7 @@ export default function ContestantCenterPage() {
         </div>
         <div className="flex-1">
           <h1 className="text-2xl font-bold">{user?.name}</h1>
-          <p className="text-white/70 text-sm">{user?.phone}</p>
+          <p className="text-white/70 text-sm">{user?.email}</p>
         </div>
         <div className="flex gap-2 text-sm">
           <span className="px-3 py-1 rounded-full bg-white/20">{records.length} 次参赛</span>
@@ -142,7 +146,8 @@ export default function ContestantCenterPage() {
               <Card className="border-0 shadow-sm max-w-md">
                 <CardContent className="space-y-4 pt-6">
                   <div className="space-y-1.5"><Label>真实姓名</Label><Input value={editName} onChange={e => setEditName(e.target.value)} /><p className="text-xs text-muted-foreground">报名和成绩单上显示的名称</p></div>
-                  <div className="space-y-1.5"><Label>手机号（登录账号）</Label><Input value={editPhone} onChange={e => setEditPhone(e.target.value)} maxLength={11} /><p className="text-xs text-muted-foreground">修改后下次请使用新手机号登录</p></div>
+                  <div className="space-y-1.5"><Label>邮箱（登录账号）</Label><Input value={editEmail} onChange={e => setEditEmail(e.target.value)} /><p className="text-xs text-muted-foreground">修改后下次请使用新邮箱登录</p></div>
+                  <div className="space-y-1.5"><Label>学校/单位</Label><Input value={editOrganization} onChange={e => setEditOrganization(e.target.value)} maxLength={200} /><p className="text-xs text-muted-foreground">选填</p></div>
                   <Button onClick={handleSaveProfile} disabled={saving} className="w-full">{saving ? '保存中...' : '保存修改'}</Button>
                 </CardContent>
               </Card>

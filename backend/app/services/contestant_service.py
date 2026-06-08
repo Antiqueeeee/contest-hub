@@ -11,34 +11,34 @@ from app.models.result import Result
 from app.services.auth_service import hash_password, verify_password
 
 
-def create_contestant_token(contestant_id: int, phone: str) -> str:
+def create_contestant_token(contestant_id: int, email: str) -> str:
     settings = get_settings()
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expire_minutes)
-    payload = {"sub": str(contestant_id), "phone": phone, "type": "contestant", "exp": expire}
+    payload = {"sub": str(contestant_id), "email": email, "type": "contestant", "exp": expire}
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
-async def register_contestant(db: AsyncSession, phone: str, password: str, name: str) -> dict:
-    existing = await db.execute(select(Contestant).where(Contestant.phone == phone))
+async def register_contestant(db: AsyncSession, email: str, password: str, name: str, id_number: str, organization: str | None = None) -> dict:
+    existing = await db.execute(select(Contestant).where(Contestant.email == email))
     if existing.scalar_one_or_none():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该手机号已注册")
-    c = Contestant(phone=phone, password_hash=hash_password(password), name=name)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该邮箱已注册")
+    c = Contestant(email=email, password_hash=hash_password(password), name=name, id_number=id_number, organization=organization)
     db.add(c)
     await db.commit()
     await db.refresh(c)
-    token = create_contestant_token(c.id, c.phone)
-    return {"access_token": token, "user": {"id": c.id, "name": c.name, "phone": c.phone}}
+    token = create_contestant_token(c.id, c.email)
+    return {"access_token": token, "user": {"id": c.id, "name": c.name, "email": c.email, "id_number": c.id_number, "organization": c.organization}}
 
 
-async def login_contestant(db: AsyncSession, phone: str, password: str) -> dict:
-    result = await db.execute(select(Contestant).where(Contestant.phone == phone))
+async def login_contestant(db: AsyncSession, email: str, password: str) -> dict:
+    result = await db.execute(select(Contestant).where(Contestant.email == email))
     c = result.scalar_one_or_none()
     if not c:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="手机号未注册")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="邮箱未注册")
     if not verify_password(password, c.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="密码错误")
-    token = create_contestant_token(c.id, c.phone)
-    return {"access_token": token, "user": {"id": c.id, "name": c.name, "phone": c.phone}}
+    token = create_contestant_token(c.id, c.email)
+    return {"access_token": token, "user": {"id": c.id, "name": c.name, "email": c.email, "id_number": c.id_number, "organization": c.organization}}
 
 
 async def get_contestant_profile(db: AsyncSession, contestant_id: int) -> Contestant:
@@ -49,16 +49,18 @@ async def get_contestant_profile(db: AsyncSession, contestant_id: int) -> Contes
     return c
 
 
-async def update_contestant_profile(db: AsyncSession, contestant_id: int, name: str | None, phone: str | None) -> Contestant:
+async def update_contestant_profile(db: AsyncSession, contestant_id: int, name: str | None, email: str | None, organization: str | None) -> Contestant:
     c = await get_contestant_profile(db, contestant_id)
     if name is not None:
         c.name = name
-    if phone is not None and phone != c.phone:
+    if email is not None and email != c.email:
         # Check uniqueness
-        existing = await db.execute(select(Contestant).where(Contestant.phone == phone))
+        existing = await db.execute(select(Contestant).where(Contestant.email == email))
         if existing.scalar_one_or_none():
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该手机号已被使用")
-        c.phone = phone
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该邮箱已被使用")
+        c.email = email
+    if organization is not None:
+        c.organization = organization
     await db.commit()
     await db.refresh(c)
     return c

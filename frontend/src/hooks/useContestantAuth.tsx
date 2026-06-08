@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 import { api } from '@/api/client'
 
-interface Contestant { id: number; name: string; phone: string }
+interface Contestant { id: number; name: string; email: string; id_number: string; organization: string | null }
 
 const TOKEN_KEY = 'contest_hub_contestant_token'
 const USER_KEY = 'contest_hub_contestant_user'
@@ -24,10 +24,10 @@ export function contestantApi() {
 
 interface AuthCtx {
   user: Contestant | null
-  login: (phone: string, password: string) => Promise<void>
-  register: (phone: string, password: string, name: string) => Promise<void>
+  login: (email: string, password: string) => Promise<void>
+  register: (email: string, password: string, name: string, idNumber: string, organization: string) => Promise<void>
   logout: () => void
-  updateProfile: (name: string, phone: string) => Promise<void>
+  updateProfile: (name: string, email: string, organization: string) => Promise<void>
   isLoggedIn: boolean
 }
 
@@ -43,15 +43,15 @@ function loadUser(): Contestant | null {
 export function ContestantAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Contestant | null>(loadUser)
 
-  const login = useCallback(async (phone: string, password: string) => {
-    const res = await api.post<{ access_token: string; user: Contestant }>('/auth/contestant/login', { phone, password })
+  const login = useCallback(async (email: string, password: string) => {
+    const res = await api.post<{ access_token: string; user: Contestant }>('/auth/contestant/login', { email, password })
     setCToken(res.access_token)
     setUser(res.user)
     sessionStorage.setItem(USER_KEY, JSON.stringify(res.user))
   }, [])
 
-  const register = useCallback(async (phone: string, password: string, name: string) => {
-    const res = await api.post<{ access_token: string; user: Contestant }>('/auth/contestant/register', { phone, password, name })
+  const register = useCallback(async (email: string, password: string, name: string, idNumber: string, organization: string) => {
+    const res = await api.post<{ access_token: string; user: Contestant }>('/auth/contestant/register', { email, password, name, id_number: idNumber, organization: organization || null })
     setCToken(res.access_token)
     setUser(res.user)
     sessionStorage.setItem(USER_KEY, JSON.stringify(res.user))
@@ -63,9 +63,9 @@ export function ContestantAuthProvider({ children }: { children: ReactNode }) {
     sessionStorage.removeItem(USER_KEY)
   }, [])
 
-  const updateProfile = useCallback(async (name: string, phone: string) => {
+  const updateProfile = useCallback(async (name: string, email: string, organization: string) => {
     const ca = contestantApi()
-    const res = await ca.put<Contestant>('/contestant/profile', { name, phone })
+    const res = await ca.put<Contestant>('/contestant/profile', { name, email, organization })
     setUser(res)
     sessionStorage.setItem(USER_KEY, JSON.stringify(res))
   }, [])

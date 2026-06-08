@@ -42,26 +42,29 @@ async def register(db: AsyncSession, data: RegistrationCreate, contestant_id: in
         if group.max_participants > 0 and count_result.scalar() >= group.max_participants:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该组别名额已满")
 
-    # Check duplicate phone+contest+group
+    # Check duplicate id_number+contest+group
     dup = await db.execute(
         select(Registration).where(
             and_(
                 Registration.contest_id == data.contest_id,
                 Registration.group_id == data.group_id,
                 Registration.deleted_at.is_(None),
-                Registration.form_data["phone"].as_string() == data.phone,
+                Registration.form_data["id_number"].as_string() == data.id_number,
             )
         )
     )
     if dup.scalar_one_or_none():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该手机号已在此赛事此组别报名")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该身份证号已在此赛事此组别报名")
 
     # Generate registration number
     count_r = await db.execute(select(func.count(Registration.id)).where(Registration.contest_id == data.contest_id))
     seq = (count_r.scalar() or 0) + 1
 
     # Build form_data
-    form_data = {"name": data.name, "phone": data.phone, **data.custom_fields}
+    form_data = {"name": data.name, "email": data.email, "id_number": data.id_number}
+    if data.organization:
+        form_data["organization"] = data.organization
+    form_data.update(data.custom_fields)
 
     reg = Registration(
         contest_id=data.contest_id,
