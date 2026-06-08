@@ -37,7 +37,7 @@ contest-hub/
 └── README.md
 ```
 
-## 快速开始
+## 快速开始（本地开发）
 
 ### 环境要求
 
@@ -80,6 +80,116 @@ npm run dev
 |------|------|------|
 | 前台首页 | http://localhost:5173 | 选手注册登录 |
 | 管理后台 | http://localhost:5173/admin/login | admin / admin123 |
+
+---
+
+## 云服务器部署（Docker Compose）
+
+### 环境要求
+
+- 服务器安装 Docker 和 Docker Compose
+- 推荐配置：2 核 4G，Linux（Ubuntu 22.04 / CentOS 7+）
+
+### 1. 安装 Docker
+
+```bash
+# Ubuntu
+curl -fsSL https://get.docker.com | bash
+sudo usermod -aG docker $USER
+
+# 安装 Docker Compose 插件
+sudo apt install docker-compose-plugin
+```
+
+### 2. 上传项目到服务器
+
+```bash
+# 在本地打包
+tar --exclude='node_modules' --exclude='.git' --exclude='__pycache__' \
+    -czf contest-hub.tar.gz contest-hub/
+
+# 上传到服务器
+scp contest-hub.tar.gz user@your-server:/opt/
+
+# 在服务器上解压
+ssh user@your-server
+cd /opt && tar -xzf contest-hub.tar.gz && cd contest-hub
+```
+
+### 3. 配置环境变量
+
+```bash
+cp .env.example .env
+nano .env  # 修改以下内容：
+```
+
+| 变量 | 说明 |
+|------|------|
+| `DB_PASSWORD` | 数据库密码，务必修改 |
+| `JWT_SECRET` | JWT 签名密钥，用 `openssl rand -hex 32` 生成 |
+| `ALLOWED_ORIGINS` | 改为你的域名，如 `http://contest.example.com` |
+| `PORT` | 前端暴露端口，默认 80（如需 HTTPS 后面加 Nginx 反代） |
+
+### 4. 启动服务
+
+```bash
+docker compose up -d --build
+```
+
+### 5. 查看日志
+
+```bash
+docker compose logs -f
+```
+
+### 6. 访问
+
+| 入口 | 地址 | 账号 |
+|------|------|------|
+| 前台首页 | http://你的服务器IP | 选手注册登录 |
+| 管理后台 | http://你的服务器IP/admin/login | admin / admin123 |
+
+### 常用运维命令
+
+```bash
+docker compose down          # 停止服务
+docker compose up -d         # 后台启动
+docker compose restart       # 重启所有服务
+docker compose logs backend  # 查看后端日志
+docker compose exec db psql -U contest -d contest_hub  # 进入数据库
+docker compose exec backend python seed.py              # 重置管理员密码
+```
+
+### 数据备份
+
+```bash
+# 备份数据库
+docker compose exec db pg_dump -U contest contest_hub > backup.sql
+
+# 定期备份（crontab）
+0 3 * * * cd /opt/contest-hub && docker compose exec -T db pg_dump -U contest contest_hub > /backup/contest_$(date +\%Y\%m\%d).sql
+```
+
+### 配置 HTTPS（可选）
+
+推荐使用 Nginx 反向代理 + Certbot：
+
+```bash
+sudo apt install nginx certbot python3-certbot-nginx
+
+# Nginx 配置示例（/etc/nginx/sites-available/contest-hub）
+# server {
+#     listen 80;
+#     server_name contest.example.com;
+#     location / {
+#         proxy_pass http://127.0.0.1:80;
+#         proxy_set_header Host $host;
+#         proxy_set_header X-Real-IP $remote_addr;
+#     }
+# }
+
+sudo certbot --nginx -d contest.example.com
+```
 
 ## 功能概览
 

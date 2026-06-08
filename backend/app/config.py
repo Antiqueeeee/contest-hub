@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 120
 
+    # CORS
+    allowed_origins: str = "http://localhost:5173"
+
     # Export
     export_dir: str = "./exports"
     export_retention_days: int = 7

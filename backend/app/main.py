@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.config import get_settings
 from app.database import init_db
 from app.api.auth import router as auth_router, admin_router as user_admin_router
 from app.api.news import admin_router as news_admin_router, public_router as news_public_router
@@ -23,7 +24,7 @@ app = FastAPI(title="竞赛信息发布平台", version="1.0.0", lifespan=lifesp
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=get_settings().allowed_origins.split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

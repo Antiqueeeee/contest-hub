@@ -1,0 +1,44 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: contest
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-contest123}
+      POSTGRES_DB: contest_hub
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U contest -d contest_hub"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://contest:${DB_PASSWORD:-contest123}@db:5432/contest_hub
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-random-string}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-120}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost}
+      EXPORT_DIR: /app/exports
+    volumes:
+      - exports:/app/exports
+
+  frontend:
+    build: ./frontend
+    restart: always
+    ports:
+      - "${PORT:-80}:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  exports:
