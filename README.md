@@ -51,7 +51,7 @@ contest-hub/
 
 ### 环境要求
 
-- Docker & Docker Compose
+- Docker & Docker Compose（`docker compose` 或 `docker-compose` 均可）
 - 推荐配置：2 核 4G，Linux（Ubuntu 22.04 / CentOS 7+）
 
 ### 1. 安装 Docker
@@ -99,6 +99,7 @@ nano .env  # 修改以下内容：
 
 ```bash
 docker compose up -d --build
+# 旧版使用: docker-compose up -d --build
 ```
 
 ### 5. 访问
@@ -111,19 +112,19 @@ docker compose up -d --build
 ### 常用运维命令
 
 ```bash
-docker compose down          # 停止服务
-docker compose up -d         # 后台启动
-docker compose restart       # 重启所有服务
-docker compose logs -f       # 查看全部日志
-docker compose logs backend  # 查看后端日志
-docker compose exec db psql -U contest -d contest_hub  # 进入数据库
-docker compose exec backend python seed.py              # 重置管理员密码
+docker compose down          # docker-compose down
+docker compose up -d         # docker-compose up -d
+docker compose restart       # docker-compose restart
+docker compose logs -f       # docker-compose logs -f
+docker compose logs backend  # docker-compose logs backend
+docker compose exec db psql -U contest -d contest_hub  # docker-compose exec ...
+docker compose exec backend python seed.py              # docker-compose exec ...
 ```
 
 ### 数据备份
 
 ```bash
-# 备份数据库
+# 备份数据库（旧版将 docker compose 替换为 docker-compose）
 docker compose exec db pg_dump -U contest contest_hub > backup.sql
 
 # 定期备份（crontab）
@@ -191,8 +192,8 @@ cp .env.example .env
 nano .env  # 修改 DB_PASSWORD、JWT_SECRET 等
 
 # 4. 构建并启动（全程无需外网）
-docker compose build
-docker compose up -d
+docker compose build      # 旧版: docker-compose build
+docker compose up -d      # 旧版: docker-compose up -d
 ```
 
 > 详细说明见 `docker-images/README.md`

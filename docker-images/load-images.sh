@@ -23,3 +23,4 @@ docker images --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}" \
 
 echo ""
 echo "现在可以执行: docker compose build && docker compose up -d"
+echo "旧版 Docker Compose: docker-compose build && docker-compose up -d"

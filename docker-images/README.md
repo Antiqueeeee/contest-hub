@@ -32,8 +32,8 @@ bash docker-images/load-images.sh
 ### 3. 构建并启动项目
 
 ```bash
-docker compose build
-docker compose up -d
+docker compose build      # 旧版: docker-compose build
+docker compose up -d      # 旧版: docker-compose up -d
 ```
 
 构建过程不再需要从 Docker Hub 拉取基础镜像，全程离线完成。
