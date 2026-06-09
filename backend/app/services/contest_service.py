@@ -194,15 +194,19 @@ async def delete_contest(db: AsyncSession, contest_id: int):
 
 # --- Helpers ---
 
-def _parse_date(v: datetime | str) -> datetime:
+def _parse_date(v: datetime | str | None) -> datetime | None:
     if isinstance(v, datetime):
         return v
+    if not v:
+        return None
     return datetime.strptime(str(v)[:10], "%Y-%m-%d")
 
 
-def _parse_datetime(v: datetime | str) -> datetime:
+def _parse_datetime(v: datetime | str | None) -> datetime | None:
     if isinstance(v, datetime):
         return v
+    if not v:
+        return None
     s = str(v).replace("T", " ")
     try:
         return datetime.strptime(s[:19], "%Y-%m-%d %H:%M:%S")

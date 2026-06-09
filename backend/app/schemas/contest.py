@@ -60,10 +60,10 @@ class ContestCreate(BaseModel):
     description: str = ""
     cover_image: str = ""
     location: str = ""
-    start_date: date | str
-    end_date: date | str
-    registration_start: datetime | str
-    registration_end: datetime | str
+    start_date: date
+    end_date: date
+    registration_start: datetime
+    registration_end: datetime
     max_participants: int = 0
     score_categories: list[str] = ["客观题得分", "主观题得分"]
     groups: list[ContestGroupIn] = []
@@ -76,10 +76,10 @@ class ContestUpdate(BaseModel):
     description: str | None = None
     cover_image: str | None = None
     location: str | None = None
-    start_date: date | str | None = None
-    end_date: date | str | None = None
-    registration_start: datetime | str | None = None
-    registration_end: datetime | str | None = None
+    start_date: date | None = None
+    end_date: date | None = None
+    registration_start: datetime | None = None
+    registration_end: datetime | None = None
     max_participants: int | None = None
     score_categories: list[str] | None = None
     groups: list[ContestGroupIn] | None = None

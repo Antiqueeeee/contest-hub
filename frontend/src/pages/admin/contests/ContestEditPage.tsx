@@ -91,6 +91,10 @@ export default function ContestEditPage() {
 
   const handleSave = async () => {
     if (!title.trim()) return alert('请输入赛事标题')
+    if (!startDate) return alert('请选择比赛开始日期')
+    if (!endDate) return alert('请选择比赛结束日期')
+    if (!regStart) return alert('请选择报名开始时间')
+    if (!regEnd) return alert('请选择报名截止时间')
     setSaving(true)
     try {
       const data = {
@@ -137,12 +141,12 @@ export default function ContestEditPage() {
             <div className="space-y-1"><Label>人数上限（0=不限）</Label><Input type="number" value={maxParticipants} onChange={e => setMaxParticipants(e.target.value)} /></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1"><Label>比赛开始</Label><Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} /></div>
-            <div className="space-y-1"><Label>比赛结束</Label><Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} /></div>
+            <div className="space-y-1"><Label>比赛开始 <span className="text-destructive">*</span></Label><Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} /></div>
+            <div className="space-y-1"><Label>比赛结束 <span className="text-destructive">*</span></Label><Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} /></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1"><Label>报名开始</Label><Input type="datetime-local" value={regStart} onChange={e => setRegStart(e.target.value)} /></div>
-            <div className="space-y-1"><Label>报名截止</Label><Input type="datetime-local" value={regEnd} onChange={e => setRegEnd(e.target.value)} /></div>
+            <div className="space-y-1"><Label>报名开始 <span className="text-destructive">*</span></Label><Input type="datetime-local" value={regStart} onChange={e => setRegStart(e.target.value)} /></div>
+            <div className="space-y-1"><Label>报名截止 <span className="text-destructive">*</span></Label><Input type="datetime-local" value={regEnd} onChange={e => setRegEnd(e.target.value)} /></div>
           </div>
         </CardContent>
       </Card>
