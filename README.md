@@ -37,6 +37,307 @@ contest-hub/
 └── README.md
 ```
 
+## 部署方式
+
+本项目支持三种部署场景，根据网络环境选择：
+
+- **[方式一：Docker Compose 部署（推荐）](#方式一docker-compose-部署推荐)** — 适合可访问 Docker Hub 的服务器
+- **[方式二：离线交付](#方式二离线交付)** — 适合服务器无法访问 Docker Hub、或镜像拉取持续失败
+- **[方式三：手动部署](#方式三手动部署)** — 适合无法使用 Docker 的裸机环境
+
+---
+
+## 方式一：Docker Compose 部署（推荐）
+
+### 环境要求
+
+- Docker & Docker Compose
+- 推荐配置：2 核 4G，Linux（Ubuntu 22.04 / CentOS 7+）
+
+### 1. 安装 Docker
+
+```bash
+# Ubuntu
+curl -fsSL https://get.docker.com | bash
+sudo usermod -aG docker $USER
+
+# 安装 Docker Compose 插件
+sudo apt install docker-compose-plugin
+```
+
+### 2. 上传项目到服务器
+
+```bash
+# 在本地打包
+tar --exclude='node_modules' --exclude='.git' --exclude='__pycache__' \
+    --exclude='docker-images/*.tar' \
+    -czf contest-hub.tar.gz contest-hub/
+
+# 上传到服务器
+scp contest-hub.tar.gz user@your-server:/opt/
+
+# 在服务器上解压
+ssh user@your-server
+cd /opt && tar -xzf contest-hub.tar.gz && cd contest-hub
+```
+
+### 3. 配置环境变量
+
+```bash
+cp .env.example .env
+nano .env  # 修改以下内容：
+```
+
+| 变量 | 说明 |
+|------|------|
+| `DB_PASSWORD` | 数据库密码，务必修改 |
+| `JWT_SECRET` | JWT 签名密钥，用 `openssl rand -hex 32` 生成 |
+| `ALLOWED_ORIGINS` | 改为你的域名，如 `http://contest.example.com` |
+| `PORT` | 前端暴露端口，默认 80 |
+
+### 4. 启动服务
+
+```bash
+docker compose up -d --build
+```
+
+### 5. 访问
+
+| 入口 | 地址 | 账号 |
+|------|------|------|
+| 前台首页 | http://你的服务器IP | 选手注册登录 |
+| 管理后台 | http://你的服务器IP/admin/login | admin / admin123 |
+
+### 常用运维命令
+
+```bash
+docker compose down          # 停止服务
+docker compose up -d         # 后台启动
+docker compose restart       # 重启所有服务
+docker compose logs -f       # 查看全部日志
+docker compose logs backend  # 查看后端日志
+docker compose exec db psql -U contest -d contest_hub  # 进入数据库
+docker compose exec backend python seed.py              # 重置管理员密码
+```
+
+### 数据备份
+
+```bash
+# 备份数据库
+docker compose exec db pg_dump -U contest contest_hub > backup.sql
+
+# 定期备份（crontab）
+0 3 * * * cd /opt/contest-hub && docker compose exec -T db pg_dump -U contest contest_hub > /backup/contest_$(date +\%Y\%m\%d).sql
+```
+
+### 配置 HTTPS（可选）
+
+```bash
+sudo apt install nginx certbot python3-certbot-nginx
+
+# Nginx 配置 /etc/nginx/sites-available/contest-hub:
+# server {
+#     listen 80;
+#     server_name contest.example.com;
+#     location / {
+#         proxy_pass http://127.0.0.1:80;
+#         proxy_set_header Host $host;
+#         proxy_set_header X-Real-IP $remote_addr;
+#     }
+# }
+
+sudo certbot --nginx -d contest.example.com
+```
+
+---
+
+## 方式二：离线交付
+
+服务器无法访问 Docker Hub 时使用。项目已预置离线镜像包。
+
+### 准备工作（由交付方执行一次）
+
+在有 Docker Hub 访问权限的机器上，拉取并导出镜像：
+
+```bash
+# 拉取项目所需基础镜像
+docker pull python:3.11-slim
+docker pull node:20-alpine
+docker pull nginx:alpine
+docker pull postgres:17-alpine
+
+# 导出为 tar 文件
+docker save -o docker-images/python-3.11-slim.tar python:3.11-slim
+docker save -o docker-images/node-20-alpine.tar node:20-alpine
+docker save -o docker-images/nginx-alpine.tar nginx:alpine
+docker save -o docker-images/postgres-17-alpine.tar postgres:17-alpine
+```
+
+将整个 `contest-hub/` 目录（含 `docker-images/`）交给客户。
+
+### 客户操作步骤
+
+```bash
+# 1. 将项目上传到服务器并解压
+scp contest-hub.tar.gz user@your-server:/opt/
+ssh user@your-server
+cd /opt && tar -xzf contest-hub.tar.gz && cd contest-hub
+
+# 2. 一键加载离线镜像
+bash docker-images/load-images.sh
+
+# 3. 配置环境变量
+cp .env.example .env
+nano .env  # 修改 DB_PASSWORD、JWT_SECRET 等
+
+# 4. 构建并启动（全程无需外网）
+docker compose build
+docker compose up -d
+```
+
+> 详细说明见 `docker-images/README.md`
+
+---
+
+## 方式三：手动部署
+
+适用于裸机环境，不依赖 Docker。
+
+### 环境要求
+
+- Node.js 18+
+- Python 3.11+
+- PostgreSQL 17+
+
+### 1. 安装系统依赖
+
+```bash
+# Ubuntu
+sudo apt update
+sudo apt install -y python3.11 python3.11-venv python3-pip nodejs npm postgresql
+
+# CentOS / RHEL
+sudo dnf install -y python3.11 python3.11-devel python3-pip nodejs npm postgresql-server
+```
+
+### 2. 配置 PostgreSQL
+
+```bash
+# 启动并创建数据库
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
+
+sudo -u postgres psql <<EOF
+CREATE USER contest WITH PASSWORD 'contest123';
+CREATE DATABASE contest_hub OWNER contest;
+GRANT ALL PRIVILEGES ON DATABASE contest_hub TO contest;
+EOF
+```
+
+### 3. 部署后端
+
+```bash
+cd backend
+
+# 创建虚拟环境
+python3.11 -m venv venv
+source venv/bin/activate
+
+# 安装依赖
+pip install --upgrade pip
+pip install -r requirements.txt
+
+# 初始化管理员账号
+python seed.py
+
+# 设置环境变量
+export DATABASE_URL="postgresql+asyncpg://contest:contest123@localhost:5432/contest_hub"
+export JWT_SECRET="$(openssl rand -hex 32)"
+export ALLOWED_ORIGINS="http://localhost"
+
+# 启动（开发测试用）
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+生产环境建议使用 systemd 管理后端进程：
+
+```ini
+# /etc/systemd/system/contest-hub.service
+[Unit]
+Description=Contest Hub Backend
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/contest-hub/backend
+Environment="DATABASE_URL=postgresql+asyncpg://contest:contest123@localhost:5432/contest_hub"
+Environment="JWT_SECRET=your-secret-here"
+Environment="ALLOWED_ORIGINS=http://your-domain.com"
+ExecStart=/opt/contest-hub/backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now contest-hub
+```
+
+### 4. 部署前端
+
+```bash
+cd frontend
+
+# 安装依赖并构建
+npm install
+npm run build
+
+# 产物在 dist/ 目录，用 Nginx 托管
+sudo cp -r dist /var/www/contest-hub
+```
+
+Nginx 配置（`/etc/nginx/sites-available/contest-hub`）：
+
+```nginx
+server {
+    listen 80;
+    server_name contest.example.com;
+
+    root /var/www/contest-hub;
+    index index.html;
+
+    # SPA fallback
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # API 反向代理到后端
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+
+```bash
+sudo ln -s /etc/nginx/sites-available/contest-hub /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+### 5. 访问
+
+| 入口 | 地址 | 账号 |
+|------|------|------|
+| 前台首页 | http://你的服务器IP | 选手注册登录 |
+| 管理后台 | http://你的服务器IP/admin/login | admin / admin123 |
+
+---
+
 ## 快速开始（本地开发）
 
 ### 环境要求
@@ -63,7 +364,7 @@ docker run -d \
 cd backend
 pip install -r requirements.txt
 python seed.py              # 创建管理员账号
-PYTHONPATH=backend uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ### 3. 启动前端
@@ -80,116 +381,6 @@ npm run dev
 |------|------|------|
 | 前台首页 | http://localhost:5173 | 选手注册登录 |
 | 管理后台 | http://localhost:5173/admin/login | admin / admin123 |
-
----
-
-## 云服务器部署（Docker Compose）
-
-### 环境要求
-
-- 服务器安装 Docker 和 Docker Compose
-- 推荐配置：2 核 4G，Linux（Ubuntu 22.04 / CentOS 7+）
-
-### 1. 安装 Docker
-
-```bash
-# Ubuntu
-curl -fsSL https://get.docker.com | bash
-sudo usermod -aG docker $USER
-
-# 安装 Docker Compose 插件
-sudo apt install docker-compose-plugin
-```
-
-### 2. 上传项目到服务器
-
-```bash
-# 在本地打包
-tar --exclude='node_modules' --exclude='.git' --exclude='__pycache__' \
-    -czf contest-hub.tar.gz contest-hub/
-
-# 上传到服务器
-scp contest-hub.tar.gz user@your-server:/opt/
-
-# 在服务器上解压
-ssh user@your-server
-cd /opt && tar -xzf contest-hub.tar.gz && cd contest-hub
-```
-
-### 3. 配置环境变量
-
-```bash
-cp .env.example .env
-nano .env  # 修改以下内容：
-```
-
-| 变量 | 说明 |
-|------|------|
-| `DB_PASSWORD` | 数据库密码，务必修改 |
-| `JWT_SECRET` | JWT 签名密钥，用 `openssl rand -hex 32` 生成 |
-| `ALLOWED_ORIGINS` | 改为你的域名，如 `http://contest.example.com` |
-| `PORT` | 前端暴露端口，默认 80（如需 HTTPS 后面加 Nginx 反代） |
-
-### 4. 启动服务
-
-```bash
-docker compose up -d --build
-```
-
-### 5. 查看日志
-
-```bash
-docker compose logs -f
-```
-
-### 6. 访问
-
-| 入口 | 地址 | 账号 |
-|------|------|------|
-| 前台首页 | http://你的服务器IP | 选手注册登录 |
-| 管理后台 | http://你的服务器IP/admin/login | admin / admin123 |
-
-### 常用运维命令
-
-```bash
-docker compose down          # 停止服务
-docker compose up -d         # 后台启动
-docker compose restart       # 重启所有服务
-docker compose logs backend  # 查看后端日志
-docker compose exec db psql -U contest -d contest_hub  # 进入数据库
-docker compose exec backend python seed.py              # 重置管理员密码
-```
-
-### 数据备份
-
-```bash
-# 备份数据库
-docker compose exec db pg_dump -U contest contest_hub > backup.sql
-
-# 定期备份（crontab）
-0 3 * * * cd /opt/contest-hub && docker compose exec -T db pg_dump -U contest contest_hub > /backup/contest_$(date +\%Y\%m\%d).sql
-```
-
-### 配置 HTTPS（可选）
-
-推荐使用 Nginx 反向代理 + Certbot：
-
-```bash
-sudo apt install nginx certbot python3-certbot-nginx
-
-# Nginx 配置示例（/etc/nginx/sites-available/contest-hub）
-# server {
-#     listen 80;
-#     server_name contest.example.com;
-#     location / {
-#         proxy_pass http://127.0.0.1:80;
-#         proxy_set_header Host $host;
-#         proxy_set_header X-Real-IP $remote_addr;
-#     }
-# }
-
-sudo certbot --nginx -d contest.example.com
-```
 
 ## 功能概览
 
