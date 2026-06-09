@@ -1,14 +1,13 @@
 #!/bin/bash
 set -e
 
-# Resolve db hostname and swap to raw IP (bypass asyncio DNS bug)
+# Resolve db hostname to raw IP (bypass Docker DNS quirks)
 echo "Waiting for database..."
 for i in $(seq 1 30); do
-    DB_IP=$(getent hosts db | awk '{print $1}')
+    DB_IP=$(getent hosts "$DB_HOST" | awk '{print $1}')
     if [ -n "$DB_IP" ]; then
-        echo "Database resolved: $DB_IP"
-        export DATABASE_URL="${DATABASE_URL//db/$DB_IP}"
-        echo "Using: ${DATABASE_URL//:*@/:***@}"
+        echo "Database resolved: $DB_HOST -> $DB_IP"
+        export DB_HOST="$DB_IP"
         break
     fi
     echo "  attempt $i/30, retrying..."

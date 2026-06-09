@@ -1,13 +1,23 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from urllib.parse import quote_plus
 
 
 class Settings(BaseSettings):
     app_name: str = "竞赛信息发布平台"
     debug: bool = True
 
-    # Database
-    database_url: str = "postgresql+asyncpg://contest:contest123@localhost:5432/contest_hub"
+    # Database (URL-encode password so special chars like @#! won't break parsing)
+    db_host: str = "localhost"
+    db_port: int = 5432
+    db_user: str = "contest"
+    db_password: str = "contest123"
+    db_name: str = "contest_hub"
+
+    @property
+    def database_url(self) -> str:
+        pwd = quote_plus(self.db_password)
+        return f"postgresql+asyncpg://{self.db_user}:{pwd}@{self.db_host}:{self.db_port}/{self.db_name}"
 
     # JWT
     jwt_secret: str = "dev-secret-change-in-production"

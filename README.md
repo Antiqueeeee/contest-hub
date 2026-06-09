@@ -257,7 +257,7 @@ pip install -r requirements.txt
 python seed.py
 
 # 设置环境变量
-export DATABASE_URL="postgresql+asyncpg://contest:contest123@localhost:5432/contest_hub"
+export DB_HOST="localhost" DB_PORT="5432" DB_USER="contest" DB_PASSWORD="contest123" DB_NAME="contest_hub"
 export JWT_SECRET="$(openssl rand -hex 32)"
 export ALLOWED_ORIGINS="http://localhost"
 
@@ -277,7 +277,11 @@ After=network.target postgresql.service
 Type=simple
 User=www-data
 WorkingDirectory=/opt/contest-hub/backend
-Environment="DATABASE_URL=postgresql+asyncpg://contest:contest123@localhost:5432/contest_hub"
+Environment="DB_HOST=localhost"
+Environment="DB_PORT=5432"
+Environment="DB_USER=contest"
+Environment="DB_PASSWORD=contest123"
+Environment="DB_NAME=contest_hub"
 Environment="JWT_SECRET=your-secret-here"
 Environment="ALLOWED_ORIGINS=http://your-domain.com"
 ExecStart=/opt/contest-hub/backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
@@ -438,7 +442,11 @@ npm run dev
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `DATABASE_URL` | `postgresql+asyncpg://contest:contest123@localhost:5432/contest_hub` | 数据库连接 |
+| `DB_HOST` | `localhost` | 数据库主机地址 |
+| `DB_PORT` | `5432` | 数据库端口 |
+| `DB_USER` | `contest` | 数据库用户名 |
+| `DB_PASSWORD` | `contest123` | 数据库密码（支持特殊字符，自动编码） |
+| `DB_NAME` | `contest_hub` | 数据库名 |
 | `JWT_SECRET` | `dev-secret-change-in-production` | JWT 签名密钥 |
 | `JWT_EXPIRE_MINUTES` | `120` | Token 有效期（分钟） |
 | `EXPORT_DIR` | `./exports` | 导出文件目录 |
