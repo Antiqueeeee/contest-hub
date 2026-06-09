@@ -172,6 +172,11 @@ docker save -o docker-images/python-3.11-slim.tar python:3.11-slim
 docker save -o docker-images/node-20-alpine.tar node:20-alpine
 docker save -o docker-images/nginx-alpine.tar nginx:alpine
 docker save -o docker-images/postgres-17-alpine.tar postgres:17-alpine
+
+# 下载 Docker Compose v2 离线安装包（x86_64）
+curl -SLo docker-images/docker-compose-linux-x86_64 \
+    https://github.com/docker/compose/releases/download/v2.33.0/docker-compose-linux-x86_64
+chmod +x docker-images/docker-compose-linux-x86_64
 ```
 
 将整个 `contest-hub/` 目录（含 `docker-images/`）交给客户。
@@ -184,7 +189,7 @@ scp contest-hub.tar.gz user@your-server:/opt/
 ssh user@your-server
 cd /opt && tar -xzf contest-hub.tar.gz && cd contest-hub
 
-# 2. 一键加载离线镜像
+# 2. 一键安装 Compose v2 + 加载离线镜像
 bash docker-images/load-images.sh
 
 # 3. 配置环境变量

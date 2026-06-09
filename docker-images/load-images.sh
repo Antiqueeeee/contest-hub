@@ -6,6 +6,24 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# ── 1. 安装 Docker Compose v2（离线） ────────────────────
+COMPOSE_BIN="/usr/local/lib/docker/cli-plugins/docker-compose"
+
+if docker compose version &>/dev/null; then
+    echo "✓ Docker Compose v2 已可用"
+elif [ -f "$SCRIPT_DIR/docker-compose-linux-x86_64" ]; then
+    echo "=== 安装 Docker Compose v2（离线） ==="
+    sudo mkdir -p /usr/local/lib/docker/cli-plugins
+    sudo cp "$SCRIPT_DIR/docker-compose-linux-x86_64" "$COMPOSE_BIN"
+    sudo chmod +x "$COMPOSE_BIN"
+    echo "✓ Docker Compose v2 安装完成"
+    docker compose version
+else
+    echo "⚠ 未找到 docker-compose-linux-x86_64，跳过安装"
+fi
+
+# ── 2. 加载 Docker 镜像 ────────────────────────────────
+echo ""
 echo "=== 开始加载 Docker 镜像 ==="
 
 for f in "$SCRIPT_DIR"/*.tar; do

@@ -35,6 +35,7 @@ Thumbs.db
 # Docker
 .docker/
 docker-images/*.tar
+docker-images/docker-compose-linux-*
 
 # Misc
 *.log
