@@ -19,6 +19,22 @@ def _build_contest_select():
     )
 
 
+def _auto_transition(contest: Contest) -> None:
+    """Auto-update contest status based on current time and registration dates."""
+    now = datetime.now(timezone.utc)
+    # Ensure datetimes are timezone-aware for comparison
+    reg_end = contest.registration_end
+    if reg_end.tzinfo is None:
+        reg_end = reg_end.replace(tzinfo=timezone.utc)
+    reg_start = contest.registration_start
+    if reg_start.tzinfo is None:
+        reg_start = reg_start.replace(tzinfo=timezone.utc)
+
+    if contest.status == ContestStatus.open:
+        if now >= reg_end:
+            contest.status = ContestStatus.ongoing
+
+
 async def list_contests(
     db: AsyncSession, keyword: str = "", status: str | None = None, page: int = 1, page_size: int = 20
 ) -> tuple[list[Contest], int]:
@@ -38,7 +54,19 @@ async def list_contests(
     query = query.order_by(Contest.created_at.desc())
     query = query.offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(query)
-    return list(result.unique().scalars().all()), total
+    contests = list(result.unique().scalars().all())
+
+    # Auto-transition contests whose registration has ended
+    changed = False
+    for c in contests:
+        old_status = c.status
+        _auto_transition(c)
+        if c.status != old_status:
+            changed = True
+    if changed:
+        await db.commit()
+
+    return contests, total
 
 
 async def get_contest(db: AsyncSession, contest_id: int) -> Contest:
@@ -46,6 +74,10 @@ async def get_contest(db: AsyncSession, contest_id: int) -> Contest:
     contest = result.unique().scalar_one_or_none()
     if not contest:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="赛事不存在")
+    _auto_transition(contest)
+    if contest in db.dirty:
+        await db.commit()
+        await db.refresh(contest)
     return contest
 
 

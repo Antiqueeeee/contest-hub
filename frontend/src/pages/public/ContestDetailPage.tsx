@@ -8,7 +8,7 @@ import { ArrowLeft, Calendar, MapPin, Users, Clock, Share2, Trophy, Award, Layer
 
 const ctaGradient = { background: 'linear-gradient(135deg, hsl(243 75% 59%), hsl(271 81% 56%))' }
 
-interface Contest { id: number; title: string; description: string; location: string; status: string; start_date: string; end_date: string; registration_start: string; registration_end: string; max_participants: number; groups: { id: number; name: string; description: string; max_participants: number }[]; awards: { id: number; name: string; description: string }[] }
+interface Contest { id: number; title: string; description: string; location: string; status: string; start_date: string; end_date: string; registration_start: string; registration_end: string; max_participants: number; is_registration_open?: boolean; is_upcoming?: boolean; groups: { id: number; name: string; description: string; max_participants: number }[]; awards: { id: number; name: string; description: string }[] }
 
 export default function ContestDetailPage() {
   const { id } = useParams()
@@ -22,10 +22,19 @@ export default function ContestDetailPage() {
   if (loading) return <div className="text-center py-12 text-muted-foreground">加载中...</div>
   if (!contest) return <div className="text-center py-20"><Trophy className="h-16 w-16 text-muted-foreground/30 mx-auto mb-4" /><p className="text-muted-foreground text-lg">赛事不存在</p><Link to="/"><Button variant="link" className="mt-2">返回首页</Button></Link></div>
 
-  const isOpen = contest.status === 'open'; const isFinished = contest.status === 'finished'
+  const now = new Date()
+  const regStart = contest.registration_start ? new Date(contest.registration_start) : null
+  const regEnd = contest.registration_end ? new Date(contest.registration_end) : null
+  const isRegistrationOpen = contest.is_registration_open ?? (contest.status === 'open' && regStart && regEnd && regStart <= now && now <= regEnd)
+  const isUpcoming = contest.is_upcoming ?? (contest.status === 'open' && regStart && now < regStart)
+  const isFinished = contest.status === 'finished'
+
   const statusCfg: Record<string, { label: string; cls: string }> = {
-    draft: { label: '草稿', cls: 'bg-gray-100 text-gray-600' }, open: { label: '报名中', cls: 'bg-green-100 text-green-700' },
-    ongoing: { label: '进行中', cls: 'bg-blue-100 text-blue-700' }, finished: { label: '已结束', cls: 'bg-gray-100 text-gray-600' }, cancelled: { label: '已取消', cls: 'bg-red-100 text-red-700' },
+    draft: { label: '草稿', cls: 'bg-gray-100 text-gray-600' },
+    open: { label: isUpcoming ? '即将报名' : '报名中', cls: isUpcoming ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700' },
+    ongoing: { label: '进行中', cls: 'bg-blue-100 text-blue-700' },
+    finished: { label: '已结束', cls: 'bg-gray-100 text-gray-600' },
+    cancelled: { label: '已取消', cls: 'bg-red-100 text-red-700' },
   }
 
   return (
@@ -38,11 +47,12 @@ export default function ContestDetailPage() {
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-muted rounded-lg"><Calendar className="h-4 w-4 text-primary" />{contest.start_date?.split('T')[0]} ~ {contest.end_date?.split('T')[0]}</span>
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-muted rounded-lg"><MapPin className="h-4 w-4 text-primary" />{contest.location}</span>
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-muted rounded-lg"><Users className="h-4 w-4 text-primary" />{contest.max_participants ? `限 ${contest.max_participants} 人` : '人数不限'}</span>
-          {isOpen && <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg"><Clock className="h-4 w-4" />截止 {contest.registration_end?.split('T')[0]}</span>}
+          {(isRegistrationOpen || isUpcoming) && <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg"><Clock className="h-4 w-4" />报名 {regStart ? `${regStart.toLocaleDateString('zh-CN')}~${regEnd?.toLocaleDateString('zh-CN')}` : ''}</span>}
         </div>
       </div>
       <div className="flex gap-3 mb-8">
-        {isOpen && <Link to={`/contests/${contest.id}/register`}><Button size="lg" className="h-12 px-8 text-base border-0 shadow-lg" style={ctaGradient}>立即报名</Button></Link>}
+        {isRegistrationOpen && <Link to={`/contests/${contest.id}/register`}><Button size="lg" className="h-12 px-8 text-base border-0 shadow-lg" style={ctaGradient}>立即报名</Button></Link>}
+        {isUpcoming && <Button size="lg" className="h-12 px-8 text-base" disabled>报名尚未开始</Button>}
         {isFinished && <Link to={`/contests/${contest.id}/results`}><Button size="lg" className="h-12 px-8 border-0 shadow-lg" style={ctaGradient}><Trophy className="h-4 w-4 mr-2" />查询成绩</Button></Link>}
         <Button variant="outline" size="lg" className="h-12"><Share2 className="h-4 w-4 mr-2" />分享</Button>
       </div>

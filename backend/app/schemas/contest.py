@@ -1,5 +1,5 @@
-from datetime import datetime, date
-from pydantic import BaseModel, Field, model_validator
+from datetime import datetime, date, timezone
+from pydantic import BaseModel, Field, model_validator, computed_field
 
 
 class ContestGroupIn(BaseModel):
@@ -107,6 +107,33 @@ class ContestOut(BaseModel):
     awards: list[AwardOut] = []
     fields: list[ContestFieldOut] = []
     model_config = {"from_attributes": True}
+
+    @computed_field
+    @property
+    def is_registration_open(self) -> bool:
+        """报名通道是否真正开启（status=open 且在当前时间范围内）"""
+        if self.status != "open":
+            return False
+        now = datetime.now(timezone.utc)
+        reg_start = self.registration_start
+        reg_end = self.registration_end
+        if reg_start.tzinfo is None:
+            reg_start = reg_start.replace(tzinfo=timezone.utc)
+        if reg_end.tzinfo is None:
+            reg_end = reg_end.replace(tzinfo=timezone.utc)
+        return reg_start <= now <= reg_end
+
+    @computed_field
+    @property
+    def is_upcoming(self) -> bool:
+        """是否即将开始报名（status=open 但还未到报名开始时间）"""
+        if self.status != "open":
+            return False
+        now = datetime.now(timezone.utc)
+        reg_start = self.registration_start
+        if reg_start.tzinfo is None:
+            reg_start = reg_start.replace(tzinfo=timezone.utc)
+        return now < reg_start
 
 
 class ContestListOut(BaseModel):

@@ -11,15 +11,27 @@ import { Plus, Search } from 'lucide-react'
 interface ContestItem {
   id: number; title: string; status: string; max_participants: number
   registration_start: string; registration_end: string; created_at: string
+  is_upcoming?: boolean; is_registration_open?: boolean
   groups: { id: number; name: string }[]
 }
 
-const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
-  draft: { label: '草稿', variant: 'secondary' },
-  open: { label: '报名中', variant: 'default' },
-  ongoing: { label: '进行中', variant: 'outline' },
-  finished: { label: '已结束', variant: 'secondary' },
-  cancelled: { label: '已取消', variant: 'destructive' },
+function getStatusLabel(c: ContestItem): { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' } {
+  if (c.status === 'open') {
+    if (c.is_upcoming) return { label: '即将报名', variant: 'outline' }
+    if (c.is_registration_open) return { label: '报名中', variant: 'default' }
+    // fallback: compute from dates
+    const now = Date.now()
+    if (c.registration_start && now < new Date(c.registration_start).getTime())
+      return { label: '即将报名', variant: 'outline' }
+    return { label: '报名中', variant: 'default' }
+  }
+  const m: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
+    draft: { label: '草稿', variant: 'secondary' },
+    ongoing: { label: '进行中', variant: 'outline' },
+    finished: { label: '已结束', variant: 'secondary' },
+    cancelled: { label: '已取消', variant: 'destructive' },
+  }
+  return m[c.status] ?? { label: c.status, variant: 'outline' }
 }
 
 export default function ContestListPage() {
@@ -76,7 +88,7 @@ export default function ContestListPage() {
         </TableRow></TableHeader>
         <TableBody>
           {items.map(c => {
-            const s = statusMap[c.status] || { label: c.status, variant: 'outline' as const }
+            const s = getStatusLabel(c)
             return (
               <TableRow key={c.id}>
                 <TableCell className="font-medium max-w-[200px] truncate">

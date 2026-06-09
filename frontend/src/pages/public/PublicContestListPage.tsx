@@ -6,12 +6,23 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Calendar, MapPin, Users, Search } from 'lucide-react'
 
-interface ContestItem { id: number; title: string; description: string; status: string; start_date: string; end_date: string; location: string; max_participants: number; registration_end: string }
+interface ContestItem { id: number; title: string; description: string; status: string; start_date: string; end_date: string; location: string; max_participants: number; registration_start: string; registration_end: string; is_registration_open?: boolean; is_upcoming?: boolean }
 
-const statusCfg: Record<string, { label: string; cls: string }> = {
-  open: { label: '报名中', cls: 'bg-green-100 text-green-700' },
-  ongoing: { label: '进行中', cls: 'bg-blue-100 text-blue-700' },
-  finished: { label: '已结束', cls: 'bg-gray-100 text-gray-600' },
+function getEffectiveStatus(c: ContestItem): { label: string; cls: string } {
+  if (c.status === 'open') {
+    if (c.is_upcoming) return { label: '即将报名', cls: 'bg-amber-100 text-amber-700' }
+    if (c.is_registration_open) return { label: '报名中', cls: 'bg-green-100 text-green-700' }
+    // Fallback: compute from dates
+    const now = new Date().getTime()
+    const regStart = c.registration_start ? new Date(c.registration_start).getTime() : 0
+    if (now < regStart) return { label: '即将报名', cls: 'bg-amber-100 text-amber-700' }
+    return { label: '报名中', cls: 'bg-green-100 text-green-700' }
+  }
+  const cfg: Record<string, { label: string; cls: string }> = {
+    ongoing: { label: '进行中', cls: 'bg-blue-100 text-blue-700' },
+    finished: { label: '已结束', cls: 'bg-gray-100 text-gray-600' },
+  }
+  return cfg[c.status] ?? { label: c.status, cls: 'bg-gray-100 text-gray-600' }
 }
 
 export default function PublicContestListPage() {
@@ -40,7 +51,7 @@ export default function PublicContestListPage() {
             <Card className="border-0 shadow-sm transition-shadow hover:shadow-md h-full">
               <CardHeader>
                 <div className="flex items-center justify-between mb-2">
-                  <Badge className={statusCfg[c.status]?.cls ?? ''}>{statusCfg[c.status]?.label ?? c.status}</Badge>
+                  {(() => { const s = getEffectiveStatus(c); return <Badge className={s.cls}>{s.label}</Badge> })()}
                 </div>
                 <CardTitle className="text-base group-hover:text-primary transition-colors">{c.title}</CardTitle>
                 <CardDescription className="line-clamp-2 text-xs">{c.description?.replace(/<[^>]+>/g, '').slice(0, 80)}</CardDescription>
