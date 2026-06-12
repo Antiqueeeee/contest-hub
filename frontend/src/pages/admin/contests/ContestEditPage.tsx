@@ -163,8 +163,16 @@ export default function ContestEditPage() {
             <div className="space-y-1"><Label>比赛结束 <span className="text-destructive">*</span></Label><Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} /></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1"><Label>报名开始 <span className="text-destructive">*</span></Label><Input type="datetime-local" value={regStart} onChange={e => setRegStart(e.target.value)} /></div>
-            <div className="space-y-1"><Label>报名截止 <span className="text-destructive">*</span></Label><Input type="datetime-local" value={regEnd} onChange={e => setRegEnd(e.target.value)} /></div>
+            <div className="space-y-1">
+              <Label>报名开始 <span className="text-destructive">*</span></Label>
+              <Input type="datetime-local" value={regStart} onChange={e => setRegStart(e.target.value)} />
+              <p className="text-xs text-muted-foreground">{TZ_OPTIONS.find(t => t.value === timezone)?.label || timezone}</p>
+            </div>
+            <div className="space-y-1">
+              <Label>报名截止 <span className="text-destructive">*</span></Label>
+              <Input type="datetime-local" value={regEnd} onChange={e => setRegEnd(e.target.value)} />
+              <p className="text-xs text-muted-foreground">{TZ_OPTIONS.find(t => t.value === timezone)?.label || timezone}</p>
+            </div>
           </div>
           <div className="space-y-1 pt-2">
             <Label className="text-muted-foreground">时区</Label>
