@@ -15,6 +15,20 @@ interface Field { field_name: string; field_type: string; is_required: boolean; 
 interface Award { name: string; description: string; sort_order: number }
 interface Template { id: number; name: string; items: { id: number; name: string; description: string; max_participants: number }[] }
 
+const TZ_OPTIONS = [
+  { value: 'Asia/Shanghai', label: '北京时间 (UTC+8)' },
+  { value: 'Asia/Tokyo', label: '东京时间 (UTC+9)' },
+  { value: 'Asia/Seoul', label: '首尔时间 (UTC+9)' },
+  { value: 'Asia/Bangkok', label: '曼谷时间 (UTC+7)' },
+  { value: 'Asia/Kolkata', label: '印度时间 (UTC+5:30)' },
+  { value: 'Europe/London', label: '伦敦时间 (UTC+0)' },
+  { value: 'Europe/Berlin', label: '柏林时间 (UTC+1)' },
+  { value: 'America/New_York', label: '美东时间 (UTC-5)' },
+  { value: 'America/Los_Angeles', label: '美西时间 (UTC-8)' },
+  { value: 'Australia/Sydney', label: '悉尼时间 (UTC+10)' },
+  { value: 'UTC', label: '协调世界时 (UTC+0)' },
+]
+
 const FIELD_TYPES = [
   { value: 'text', label: '文本' },
   { value: 'number', label: '数字' },
@@ -38,6 +52,7 @@ export default function ContestEditPage() {
   const [regStart, setRegStart] = useState('')
   const [regEnd, setRegEnd] = useState('')
   const [maxParticipants, setMaxParticipants] = useState('0')
+  const [timezone, setTimezone] = useState('Asia/Shanghai')
 
   // Groups - selected item IDs from templates
   const [templates, setTemplates] = useState<Template[]>([])
@@ -61,6 +76,7 @@ export default function ContestEditPage() {
       api.get<{
         title: string; description: string; location: string; start_date: string; end_date: string
         registration_start: string; registration_end: string; max_participants: number; score_categories: string[] | null
+        timezone: string
         groups: { id: number; name: string; template_item_id: number }[]; awards: Award[]; fields: Field[]
       }>(`/admin/contests/${id}`).then(c => {
         setTitle(c.title); setDescription(c.description); setLocation(c.location)
@@ -74,6 +90,7 @@ export default function ContestEditPage() {
         setAwardsList(c.awards || [])
         setFields(c.fields || [])
         if (c.score_categories?.length) setScoreCategories(c.score_categories)
+        if (c.timezone) setTimezone(c.timezone)
         // Map contest groups to template item IDs for checkbox selection
         if (c.groups?.length > 0) {
           setSelectedGroupIds(c.groups.map(g => g.template_item_id || g.id))
@@ -112,6 +129,7 @@ export default function ContestEditPage() {
         awards: awardsList.filter(a => a.name),
         score_categories: scoreCategories.filter(s => s.trim()),
         fields: fields.filter(f => f.field_name),
+        timezone,
       }
       if (isNew) await api.post('/admin/contests', data)
       else await api.put(`/admin/contests/${id}`, data)
@@ -147,6 +165,14 @@ export default function ContestEditPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1"><Label>报名开始 <span className="text-destructive">*</span></Label><Input type="datetime-local" value={regStart} onChange={e => setRegStart(e.target.value)} /></div>
             <div className="space-y-1"><Label>报名截止 <span className="text-destructive">*</span></Label><Input type="datetime-local" value={regEnd} onChange={e => setRegEnd(e.target.value)} /></div>
+          </div>
+          <div className="space-y-1">
+            <Label>时区</Label>
+            <select value={timezone} onChange={e => setTimezone(e.target.value)}
+              className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
+              {TZ_OPTIONS.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
+            </select>
+            <p className="text-xs text-muted-foreground">以上所有时间均以此为时区基准，默认北京时间</p>
           </div>
         </CardContent>
       </Card>

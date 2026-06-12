@@ -23,9 +23,10 @@ def _build_contest_select():
 
 def _derive_status(contest: Contest, now: datetime) -> ContestStatus:
     """Compute the time-driven status from dates alone (ignores current status)."""
-    reg_start = to_aware(contest.registration_start)
-    reg_end = to_aware(contest.registration_end)
-    end_date = to_aware(contest.end_date)
+    tz = contest.timezone
+    reg_start = to_aware(contest.registration_start, tz)
+    reg_end = to_aware(contest.registration_end, tz)
+    end_date = to_aware(contest.end_date, tz)
 
     if now < reg_start:
         return ContestStatus.draft
@@ -62,12 +63,13 @@ def _validate_contest_dates(
     end_date: datetime,
     registration_start: datetime,
     registration_end: datetime,
+    timezone: str = "Asia/Shanghai",
 ) -> None:
     """Validate contest date relationships."""
-    sd = to_aware(start_date)
-    ed = to_aware(end_date)
-    rs = to_aware(registration_start)
-    re = to_aware(registration_end)
+    sd = to_aware(start_date, timezone)
+    ed = to_aware(end_date, timezone)
+    rs = to_aware(registration_start, timezone)
+    re = to_aware(registration_end, timezone)
 
     if sd >= ed:
         raise HTTPException(
@@ -145,12 +147,14 @@ async def create_contest(db: AsyncSession, data: ContestCreate, creator_id: int)
         registration_end=_parse_datetime(data.registration_end),
         max_participants=data.max_participants,
         score_categories=data.score_categories,
+        timezone=data.timezone,
     )
     _validate_contest_dates(
         contest.start_date,
         contest.end_date,
         contest.registration_start,
         contest.registration_end,
+        contest.timezone,
     )
     # Set initial status based on dates rather than always defaulting to draft
     now = datetime.now(timezone.utc)
@@ -206,6 +210,7 @@ async def update_contest(db: AsyncSession, contest_id: int, data: ContestUpdate)
         contest.end_date,
         contest.registration_start,
         contest.registration_end,
+        contest.timezone,
     )
 
     # Recompute status from new dates (unless manually cancelled)

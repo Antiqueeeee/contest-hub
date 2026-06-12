@@ -25,13 +25,14 @@ async def register(db: AsyncSession, data: RegistrationCreate, contestant_id: in
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该赛事当前不可报名")
 
     now = datetime.now(timezone.utc)
+    tz = contest.timezone
 
     # Check registration window
-    reg_start = to_aware(contest.registration_start)
+    reg_start = to_aware(contest.registration_start, tz)
     if now < reg_start:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="报名尚未开始")
 
-    reg_end = to_aware(contest.registration_end)
+    reg_end = to_aware(contest.registration_end, tz)
     if now > reg_end:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="报名已截止")
 

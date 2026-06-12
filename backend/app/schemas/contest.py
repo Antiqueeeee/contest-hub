@@ -67,6 +67,7 @@ class ContestCreate(BaseModel):
     registration_end: datetime
     max_participants: int = 0
     score_categories: list[str] = ["客观题得分", "主观题得分"]
+    timezone: str = "Asia/Shanghai"
     groups: list[ContestGroupIn] = []
     awards: list[AwardIn] = []
     fields: list[ContestFieldIn] = []
@@ -83,6 +84,7 @@ class ContestUpdate(BaseModel):
     registration_end: datetime | None = None
     max_participants: int | None = None
     score_categories: list[str] | None = None
+    timezone: str | None = None
     groups: list[ContestGroupIn] | None = None
     awards: list[AwardIn] | None = None
     fields: list[ContestFieldIn] | None = None
@@ -107,6 +109,7 @@ class ContestOut(BaseModel):
     groups: list[ContestGroupOut] = []
     awards: list[AwardOut] = []
     fields: list[ContestFieldOut] = []
+    timezone: str = "Asia/Shanghai"
     model_config = {"from_attributes": True}
 
     @computed_field
@@ -116,7 +119,8 @@ class ContestOut(BaseModel):
         if self.status != "open":
             return False
         now = datetime.now(timezone.utc)
-        return to_aware(self.registration_start) <= now <= to_aware(self.registration_end)
+        tz = self.timezone
+        return to_aware(self.registration_start, tz) <= now <= to_aware(self.registration_end, tz)
 
     @computed_field
     @property
@@ -125,7 +129,7 @@ class ContestOut(BaseModel):
         if self.status != "open":
             return False
         now = datetime.now(timezone.utc)
-        return now < to_aware(self.registration_start)
+        return now < to_aware(self.registration_start, self.timezone)
 
 
 class ContestListOut(BaseModel):
