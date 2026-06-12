@@ -26,28 +26,65 @@ def _make_aware(dt: datetime) -> datetime:
     return dt
 
 
+def _derive_status(contest: Contest, now: datetime) -> ContestStatus:
+    """Compute the time-driven status from dates alone (ignores current status)."""
+    reg_start = _make_aware(contest.registration_start)
+    reg_end = _make_aware(contest.registration_end)
+    end_date = _make_aware(contest.end_date)
+
+    if now < reg_start:
+        return ContestStatus.draft
+    elif now < reg_end:
+        return ContestStatus.open
+    elif now < end_date:
+        return ContestStatus.ongoing
+    else:
+        return ContestStatus.finished
+
+
 def _auto_transition(contest: Contest) -> None:
-    """Auto-update contest status based on current time relative to key dates."""
+    """Forward-only auto-update based on current time and key dates."""
     now = datetime.now(timezone.utc)
+    derived = _derive_status(contest, now)
 
-    if contest.status == ContestStatus.draft:
-        # Auto-publish when registration start time arrives
-        reg_start = _make_aware(contest.registration_start)
-        if now >= reg_start:
-            contest.status = ContestStatus.open
-            # Fall through: check if open→ongoing also applies
-        else:
-            return
+    # Only move forward — don't revert explicit status changes
+    status_order = {
+        ContestStatus.draft: 0,
+        ContestStatus.open: 1,
+        ContestStatus.ongoing: 2,
+        ContestStatus.finished: 3,
+    }
+    if status_order.get(derived, -1) > status_order.get(contest.status, -1):
+        contest.status = derived
 
-    if contest.status == ContestStatus.open:
-        reg_end = _make_aware(contest.registration_end)
-        if now >= reg_end:
-            contest.status = ContestStatus.ongoing
 
-    if contest.status == ContestStatus.ongoing:
-        end_date = _make_aware(contest.end_date)
-        if now >= end_date:
-            contest.status = ContestStatus.finished
+def _validate_contest_dates(
+    start_date: datetime,
+    end_date: datetime,
+    registration_start: datetime,
+    registration_end: datetime,
+) -> None:
+    """Validate contest date relationships."""
+    sd = _make_aware(start_date)
+    ed = _make_aware(end_date)
+    rs = _make_aware(registration_start)
+    re = _make_aware(registration_end)
+
+    if sd >= ed:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="比赛开始日期必须早于结束日期",
+        )
+    if rs >= re:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="报名开始时间必须早于报名截止时间",
+        )
+    if re.date() > ed.date():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="报名截止日期不能晚于比赛结束日期",
+        )
 
 
 async def list_contests(
@@ -110,6 +147,18 @@ async def create_contest(db: AsyncSession, data: ContestCreate, creator_id: int)
         max_participants=data.max_participants,
         score_categories=data.score_categories,
     )
+    _validate_contest_dates(
+        contest.start_date,
+        contest.end_date,
+        contest.registration_start,
+        contest.registration_end,
+    )
+    # Set initial status based on dates rather than always defaulting to draft
+    now = datetime.now(timezone.utc)
+    derived = _derive_status(contest, now)
+    if derived != contest.status:
+        contest.status = derived
+
     db.add(contest)
     await db.flush()
 
@@ -151,6 +200,21 @@ async def update_contest(db: AsyncSession, contest_id: int, data: ContestUpdate)
 
     for key, val in update_data.items():
         setattr(contest, key, val)
+
+    # Validate dates after merging updates
+    _validate_contest_dates(
+        contest.start_date,
+        contest.end_date,
+        contest.registration_start,
+        contest.registration_end,
+    )
+
+    # Recompute status from new dates (unless manually cancelled)
+    if contest.status != ContestStatus.cancelled:
+        now = datetime.now(timezone.utc)
+        derived = _derive_status(contest, now)
+        if derived != contest.status:
+            contest.status = derived
 
     if groups_data is not None:
         await db.execute(select(ContestGroup).where(ContestGroup.contest_id == contest_id))
