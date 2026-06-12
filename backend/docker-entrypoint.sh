@@ -14,6 +14,9 @@ for i in $(seq 1 30); do
     sleep 1
 done
 
+echo "Running database migrations..."
+alembic upgrade head
+
 echo "Running database seed..."
 python seed.py
 
