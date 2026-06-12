@@ -138,7 +138,7 @@ async def delete_news(db: AsyncSession, news_id: int):
 # --- Public ---
 
 async def list_public_news(db: AsyncSession, page: int = 1, page_size: int = 10) -> tuple[list[News], int]:
-    query = select(News).where(News.status == NewsStatus.published)
+    query = select(News).options(joinedload(News.category)).where(News.status == NewsStatus.published)
     count_query = select(func.count(News.id)).where(News.status == NewsStatus.published)
 
     total_result = await db.execute(count_query)
@@ -152,7 +152,7 @@ async def list_public_news(db: AsyncSession, page: int = 1, page_size: int = 10)
 
 async def get_public_news_detail(db: AsyncSession, news_id: int) -> News:
     result = await db.execute(
-        select(News).where(News.id == news_id, News.status == NewsStatus.published)
+        select(News).options(joinedload(News.category)).where(News.id == news_id, News.status == NewsStatus.published)
     )
     news = result.scalar_one_or_none()
     if not news:

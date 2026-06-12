@@ -23,8 +23,19 @@ async def register(db: AsyncSession, data: RegistrationCreate, contestant_id: in
     if contest.status != ContestStatus.open:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该赛事当前不可报名")
 
-    # Check registration deadline
-    if datetime.now(timezone.utc) > contest.registration_end.replace(tzinfo=timezone.utc):
+    now = datetime.now(timezone.utc)
+
+    # Check registration window
+    reg_start = contest.registration_start
+    if reg_start.tzinfo is None:
+        reg_start = reg_start.replace(tzinfo=timezone.utc)
+    if now < reg_start:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="报名尚未开始")
+
+    reg_end = contest.registration_end
+    if reg_end.tzinfo is None:
+        reg_end = reg_end.replace(tzinfo=timezone.utc)
+    if now > reg_end:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="报名已截止")
 
     # Check group and capacity

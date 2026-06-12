@@ -50,6 +50,8 @@ async def list_news(
         d = NewsOut.model_validate(n).model_dump()
         if n.author:
             d['author_name'] = n.author.name
+        if n.category:
+            d['category_name'] = n.category.name
         result.append(d)
     return {"items": result, "total": total, "page": page, "page_size": page_size}
 
@@ -86,7 +88,13 @@ async def delete_news(news_id: int, db: AsyncSession = Depends(get_db), current_
 @public_router.get("/news")
 async def public_news_list(page: int = Query(default=1, ge=1), page_size: int = Query(default=10, ge=1, le=50), db: AsyncSession = Depends(get_db)):
     items, total = await news_service.list_public_news(db, page, page_size)
-    return {"items": [NewsOut.model_validate(n).model_dump() for n in items], "total": total}
+    result = []
+    for n in items:
+        d = NewsOut.model_validate(n).model_dump()
+        if n.category:
+            d['category_name'] = n.category.name
+        result.append(d)
+    return {"items": result, "total": total}
 
 
 @public_router.get("/news/{news_id}", response_model=NewsOut)

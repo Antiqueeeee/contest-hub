@@ -19,20 +19,35 @@ def _build_contest_select():
     )
 
 
+def _make_aware(dt: datetime) -> datetime:
+    """Ensure a datetime is timezone-aware (UTC)."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 def _auto_transition(contest: Contest) -> None:
-    """Auto-update contest status based on current time and registration dates."""
+    """Auto-update contest status based on current time relative to key dates."""
     now = datetime.now(timezone.utc)
-    # Ensure datetimes are timezone-aware for comparison
-    reg_end = contest.registration_end
-    if reg_end.tzinfo is None:
-        reg_end = reg_end.replace(tzinfo=timezone.utc)
-    reg_start = contest.registration_start
-    if reg_start.tzinfo is None:
-        reg_start = reg_start.replace(tzinfo=timezone.utc)
+
+    if contest.status == ContestStatus.draft:
+        # Auto-publish when registration start time arrives
+        reg_start = _make_aware(contest.registration_start)
+        if now >= reg_start:
+            contest.status = ContestStatus.open
+            # Fall through: check if open→ongoing also applies
+        else:
+            return
 
     if contest.status == ContestStatus.open:
+        reg_end = _make_aware(contest.registration_end)
         if now >= reg_end:
             contest.status = ContestStatus.ongoing
+
+    if contest.status == ContestStatus.ongoing:
+        end_date = _make_aware(contest.end_date)
+        if now >= end_date:
+            contest.status = ContestStatus.finished
 
 
 async def list_contests(

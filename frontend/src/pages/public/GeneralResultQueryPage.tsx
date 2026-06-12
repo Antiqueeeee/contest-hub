@@ -1,76 +1,151 @@
-import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { api } from '@/api/client'
-import { Button } from '@/components/ui/button'
+import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useContestantAuth, contestantApi } from '@/hooks/useContestantAuth'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Search } from 'lucide-react'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Search, Medal, Trophy } from 'lucide-react'
 
-interface Contest { id: number; title: string; status: string }
+interface ResultItem {
+  id: number
+  registration_number: string
+  contest_title: string
+  total_score: number
+  rank: number | null
+  award_name: string
+  scores: Record<string, number>
+}
 
 export default function GeneralResultQueryPage() {
-  const [contests, setContests] = useState<Contest[]>([])
-  const [contestId, setContestId] = useState('')
-  const [regNumber, setRegNumber] = useState('')
-  const [email, setEmail] = useState('')
-  const [found, setFound] = useState<any>(null)
-  const [queried, setQueried] = useState(false)
-  const [querying, setQuerying] = useState(false)
-  const [error, setError] = useState('')
+  const { isLoggedIn } = useContestantAuth()
+  const navigate = useNavigate()
 
   useEffect(() => {
-    api.get<{ items: Contest[] }>('/public/contests').then(r => {
-      setContests(r.items.filter(c => c.status === 'finished'))
-    }).catch(console.error)
-  }, [])
+    if (!isLoggedIn) {
+      navigate('/login', { replace: true })
+    }
+  }, [isLoggedIn, navigate])
 
-  const handleQuery = async () => {
-    setError(''); setQueried(true)
-    if (!contestId) { setError('请选择赛事'); return }
-    if (!regNumber.trim() || !email.trim()) { setError('请输入报名编号和邮箱'); return }
-    setQuerying(true)
-    try {
-      const res = await api.post<any>(`/public/contests/${contestId}/query-result`, { registration_number: regNumber, email })
-      setFound(res)
-    } catch { setFound(null) }
-    finally { setQuerying(false) }
-  }
+  const [results, setResults] = useState<ResultItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+
+  useEffect(() => {
+    if (!isLoggedIn) return
+    contestantApi().get<{ items: ResultItem[] }>('/contestant/results')
+      .then(r => setResults(r.items || []))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [isLoggedIn])
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return results
+    const kw = search.trim().toLowerCase()
+    return results.filter(r =>
+      r.contest_title.toLowerCase().includes(kw) ||
+      r.registration_number.toLowerCase().includes(kw) ||
+      (r.award_name && r.award_name.toLowerCase().includes(kw))
+    )
+  }, [results, search])
+
+  // 未登录时不渲染页面内容
+  if (!isLoggedIn) return null
 
   return (
-    <div className="max-w-lg mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-6">成绩查询</h1>
-      <Card>
-        <CardHeader><CardTitle className="text-lg">查询您的比赛成绩</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-1"><Label>选择赛事</Label>
-            <select value={contestId} onChange={e => { setContestId(e.target.value); setQueried(false) }} className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
-              <option value="">请选择已结束的赛事</option>
-              {contests.map(c => <option key={c.id} value={String(c.id)}>{c.title}</option>)}
-            </select>
+    <div className="max-w-5xl mx-auto py-8">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold">成绩查询</h1>
+        {results.length > 0 && (
+          <div className="relative w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              className="pl-9"
+              placeholder="搜索赛事名称..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
           </div>
-          <div className="space-y-1"><Label>报名编号</Label><Input value={regNumber} onChange={e => { setRegNumber(e.target.value); setQueried(false) }} placeholder="请输入报名编号" /></div>
-          <div className="space-y-1"><Label>邮箱</Label><Input value={email} onChange={e => { setEmail(e.target.value); setQueried(false) }} placeholder="请输入报名时填写的邮箱" /></div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <Button className="w-full" onClick={handleQuery} disabled={querying}><Search className="h-4 w-4 mr-1" />{querying ? '查询中...' : '查询成绩'}</Button>
-          {queried && found && (
-            <div className="mt-4 p-4 bg-muted rounded-lg space-y-2">
-              <h3 className="font-bold text-lg">{found.name}</h3>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                {Object.entries(found.scores || {}).map(([k, v]) => <div key={k} className="flex justify-between"><span className="text-muted-foreground">{k}</span><span>{String(v)}</span></div>)}
-                <div className="flex justify-between border-t pt-1 mt-1 col-span-2"><span className="font-medium">总分</span><span className="font-bold text-lg">{found.total_score}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">排名</span><span>第 {found.rank ?? '-'} 名</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">奖项</span><span className="font-medium text-primary">{found.award_name || '无'}</span></div>
-              </div>
-            </div>
-          )}
-          {queried && !found && !error && !querying && <p className="text-sm text-muted-foreground text-center py-4">未查询到成绩，请检查输入信息是否正确。</p>}
-        </CardContent>
-      </Card>
-      <p className="text-xs text-muted-foreground text-center mt-4">
-        也可以从赛事详情页进入成绩查询。已有账号？
-        <Link to="/login" className="text-primary hover:underline ml-1">登录</Link>后可在个人中心查看成绩。
-      </p>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="text-center py-20 text-muted-foreground">加载中...</div>
+      ) : results.length === 0 ? (
+        <Card className="border-0 shadow-sm">
+          <CardContent className="text-center py-16">
+            <Trophy className="h-16 w-16 mx-auto mb-4 text-muted-foreground/20" />
+            <p className="text-muted-foreground mb-1">暂无成绩记录</p>
+            <p className="text-sm text-muted-foreground/60">参与的比赛结束后，成绩将会在这里展示</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-0">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Medal className="h-5 w-5 text-primary" />
+              共 {results.length} 场赛事成绩
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">#</TableHead>
+                  <TableHead>赛事名称</TableHead>
+                  <TableHead>报名编号</TableHead>
+                  <TableHead>总分</TableHead>
+                  <TableHead>排名</TableHead>
+                  <TableHead>奖项</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((r, idx) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="text-muted-foreground text-sm">{idx + 1}</TableCell>
+                    <TableCell className="font-medium">{r.contest_title}</TableCell>
+                    <TableCell className="font-mono text-sm text-muted-foreground">{r.registration_number}</TableCell>
+                    <TableCell>
+                      <span className="font-bold text-lg">{r.total_score}</span>
+                      {/* 各科小分 */}
+                      {r.scores && Object.keys(r.scores).length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {Object.entries(r.scores).map(([k, v]) => (
+                            <span key={k} className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                              {k}: {v}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {r.rank != null ? (
+                        <span className="font-medium">第 {r.rank} 名</span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {r.award_name ? (
+                        <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">{r.award_name}</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {filtered.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      未找到匹配的成绩记录
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

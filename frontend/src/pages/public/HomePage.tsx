@@ -5,10 +5,29 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Calendar, MapPin, Users, ArrowRight } from 'lucide-react'
 
-interface NewsItem { id: number; title: string; category_id: number; is_pinned: boolean; status: string; published_at: string | null }
-interface ContestItem { id: number; title: string; description: string; status: string; start_date: string; end_date: string; location: string; max_participants: number; registration_end: string }
+interface NewsItem { id: number; title: string; category_id: number; category_name: string; is_pinned: boolean; status: string; published_at: string | null }
+interface ContestItem { id: number; title: string; description: string; status: string; start_date: string; end_date: string; location: string; max_participants: number; registration_start: string; registration_end: string; is_registration_open?: boolean; is_upcoming?: boolean }
 
 const heroGradient = { background: 'linear-gradient(135deg, hsl(243 75% 59%) 0%, hsl(271 81% 56%) 100%)' }
+
+function getEffectiveStatus(c: ContestItem): { label: string; cls: string } {
+  if (c.status === 'open') {
+    if (c.is_upcoming) return { label: '即将报名', cls: 'bg-amber-100 text-amber-700' }
+    if (c.is_registration_open) return { label: '报名中', cls: 'bg-green-100 text-green-700' }
+    // Fallback: compute from dates when computed fields are unavailable
+    const now = new Date().getTime()
+    const regStart = c.registration_start ? new Date(c.registration_start).getTime() : 0
+    const regEnd = c.registration_end ? new Date(c.registration_end).getTime() : 0
+    if (now < regStart) return { label: '即将报名', cls: 'bg-amber-100 text-amber-700' }
+    if (now > regEnd) return { label: '进行中', cls: 'bg-blue-100 text-blue-700' }
+    return { label: '报名中', cls: 'bg-green-100 text-green-700' }
+  }
+  const cfg: Record<string, { label: string; cls: string }> = {
+    ongoing: { label: '进行中', cls: 'bg-blue-100 text-blue-700' },
+    finished: { label: '已结束', cls: 'bg-gray-100 text-gray-600' },
+  }
+  return cfg[c.status] ?? { label: c.status, cls: 'bg-gray-100 text-gray-600' }
+}
 
 export default function HomePage() {
   const [news, setNews] = useState<NewsItem[]>([])
@@ -25,11 +44,6 @@ export default function HomePage() {
   }, [])
 
   const visibleContests = contests.filter(c => c.status !== 'draft' && c.status !== 'cancelled')
-  const statusCfg: Record<string, { label: string; cls: string }> = {
-    open: { label: '报名中', cls: 'bg-green-100 text-green-700' },
-    ongoing: { label: '进行中', cls: 'bg-blue-100 text-blue-700' },
-    finished: { label: '已结束', cls: 'bg-gray-100 text-gray-600' },
-  }
 
   if (loading) return <div className="text-center py-20 text-muted-foreground">加载中...</div>
 
@@ -61,7 +75,7 @@ export default function HomePage() {
                 <CardHeader>
                   <div className="flex items-center gap-2 mb-2">
                     {n.is_pinned && <Badge variant="secondary" className="text-xs">置顶</Badge>}
-                    <Badge variant="outline" className="text-xs">{n.category_id === 1 ? '赛事通知' : n.category_id === 2 ? '行业动态' : '获奖公告'}</Badge>
+                    <Badge variant="outline" className="text-xs">{n.category_name || '未分类'}</Badge>
                   </div>
                   <CardTitle className="text-sm leading-snug group-hover:text-primary transition-colors">{n.title}</CardTitle>
                   <CardDescription className="text-xs">{n.published_at?.split('T')[0]}</CardDescription>
@@ -89,7 +103,7 @@ export default function HomePage() {
               <Card className="border-0 shadow-sm transition-shadow hover:shadow-md h-full">
                 <CardHeader>
                   <div className="flex items-center justify-between mb-2">
-                    <Badge className={statusCfg[c.status]?.cls ?? ''}>{statusCfg[c.status]?.label ?? c.status}</Badge>
+                    {(() => { const s = getEffectiveStatus(c); return <Badge className={s.cls}>{s.label}</Badge> })()}
                   </div>
                   <CardTitle className="text-base group-hover:text-primary transition-colors">{c.title}</CardTitle>
                   <CardDescription className="line-clamp-2 text-xs">{c.description?.replace(/<[^>]+>/g, '').slice(0, 80)}</CardDescription>

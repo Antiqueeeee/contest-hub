@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ArrowLeft, Clock } from 'lucide-react'
 
-interface Contest { id: number; title: string; status: string; registration_end: string; groups: { id: number; name: string; max_participants: number }[]; fields: { id: number; field_name: string; field_type: string; is_required: boolean; options: string[] | null }[] }
+interface Contest { id: number; title: string; status: string; registration_start: string; registration_end: string; groups: { id: number; name: string; max_participants: number }[]; fields: { id: number; field_name: string; field_type: string; is_required: boolean; options: string[] | null }[] }
 
 export default function ContestRegisterPage() {
   const { id } = useParams()
@@ -41,6 +41,10 @@ export default function ContestRegisterPage() {
 
   if (loading) return <div className="text-center py-12 text-muted-foreground">加载中...</div>
   if (!contest || contest.status !== 'open') return <div className="text-center py-12"><p className="text-muted-foreground">{contest ? '该赛事当前不可报名' : '赛事不存在'}</p><Link to="/"><Button variant="link" className="mt-2">返回首页</Button></Link></div>
+
+  const now = new Date()
+  if (contest.registration_start && now < new Date(contest.registration_start)) return <div className="text-center py-12"><p className="text-muted-foreground">报名尚未开始</p><Link to={`/contests/${contest.id}`}><Button variant="link" className="mt-2">返回赛事详情</Button></Link></div>
+  if (contest.registration_end && now > new Date(contest.registration_end)) return <div className="text-center py-12"><p className="text-muted-foreground">报名已截止</p><Link to={`/contests/${contest.id}`}><Button variant="link" className="mt-2">返回赛事详情</Button></Link></div>
 
   const validate = () => {
     const e: Record<string, string> = {}

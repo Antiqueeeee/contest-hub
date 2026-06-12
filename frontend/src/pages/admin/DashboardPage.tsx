@@ -30,7 +30,25 @@ export default function DashboardPage() {
     }).catch(console.error).finally(() => setLoading(false))
   }, [])
 
-  const openCount = contests.filter(c => c.status === 'open').length
+  function getStatusLabel(c: any) {
+    if (c.status === 'open') {
+      if (c.is_upcoming) return { label: '即将报名', cls: 'bg-amber-100 text-amber-700' }
+      if (c.is_registration_open === false) return { label: '报名截止', cls: 'bg-blue-100 text-blue-700' }
+      return { label: '报名中', cls: 'bg-green-100 text-green-700' }
+    }
+    const cfg: Record<string, { label: string; cls: string }> = {
+      ongoing: { label: '进行中', cls: 'bg-blue-100 text-blue-700' },
+      finished: { label: '已结束', cls: 'bg-gray-100 text-gray-600' },
+    }
+    return cfg[c.status] ?? { label: c.status, cls: 'bg-gray-100 text-gray-600' }
+  }
+
+  const openCount = contests.filter(c => {
+    if (c.status !== 'open') return false
+    if (c.is_upcoming) return false
+    if (c.is_registration_open === false) return false
+    return true
+  }).length
   const stats = [
     { label: '赛事总数', value: contests.length, sub: `${openCount} 个报名中`, icon: Flag },
     { label: '报名总数', value: regTotal, sub: '人次', icon: ClipboardList },
@@ -85,13 +103,12 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             {contests.filter(c => c.status !== 'draft').slice(0, 5).map(c => {
-              const sl: Record<string, string> = { open: '报名中', ongoing: '进行中', finished: '已结束' }
-              const sc: Record<string, string> = { open: 'bg-green-100 text-green-700', ongoing: 'bg-blue-100 text-blue-700', finished: 'bg-gray-100 text-gray-600' }
+              const s = getStatusLabel(c)
               return (
                 <Link key={c.id} to={`/admin/contests/${c.id}`} className="no-underline">
                   <div className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors">
                     <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{c.title}</p><p className="text-xs text-muted-foreground mt-0.5">{c.start_date?.split('T')[0]} ~ {c.end_date?.split('T')[0]}</p></div>
-                    <Badge className={sc[c.status] ?? '' + ' text-xs ml-4'} variant="outline">{sl[c.status] ?? c.status}</Badge>
+                    <Badge className={s.cls + ' text-xs ml-4'} variant="outline">{s.label}</Badge>
                   </div>
                 </Link>
               )
