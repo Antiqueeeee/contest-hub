@@ -6,6 +6,7 @@ from fastapi import HTTPException, status
 from app.models.contest import Contest, ContestGroup, ContestStatus
 from app.models.registration import Registration
 from app.schemas.registration import RegistrationCreate
+from app.utils.timezone import to_aware
 
 
 def _gen_registration_number(contest_id: int, seq: int) -> str:
@@ -26,15 +27,11 @@ async def register(db: AsyncSession, data: RegistrationCreate, contestant_id: in
     now = datetime.now(timezone.utc)
 
     # Check registration window
-    reg_start = contest.registration_start
-    if reg_start.tzinfo is None:
-        reg_start = reg_start.replace(tzinfo=timezone.utc)
+    reg_start = to_aware(contest.registration_start)
     if now < reg_start:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="报名尚未开始")
 
-    reg_end = contest.registration_end
-    if reg_end.tzinfo is None:
-        reg_end = reg_end.replace(tzinfo=timezone.utc)
+    reg_end = to_aware(contest.registration_end)
     if now > reg_end:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="报名已截止")
 

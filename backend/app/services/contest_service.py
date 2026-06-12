@@ -6,6 +6,7 @@ from fastapi import HTTPException, status
 
 from app.models.contest import Contest, ContestGroup, Award, ContestField, ContestStatus
 from app.schemas.contest import ContestCreate, ContestUpdate
+from app.utils.timezone import to_aware
 
 
 def _build_contest_select():
@@ -19,18 +20,12 @@ def _build_contest_select():
     )
 
 
-def _make_aware(dt: datetime) -> datetime:
-    """Ensure a datetime is timezone-aware (UTC)."""
-    if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt
-
 
 def _derive_status(contest: Contest, now: datetime) -> ContestStatus:
     """Compute the time-driven status from dates alone (ignores current status)."""
-    reg_start = _make_aware(contest.registration_start)
-    reg_end = _make_aware(contest.registration_end)
-    end_date = _make_aware(contest.end_date)
+    reg_start = to_aware(contest.registration_start)
+    reg_end = to_aware(contest.registration_end)
+    end_date = to_aware(contest.end_date)
 
     if now < reg_start:
         return ContestStatus.draft
@@ -69,10 +64,10 @@ def _validate_contest_dates(
     registration_end: datetime,
 ) -> None:
     """Validate contest date relationships."""
-    sd = _make_aware(start_date)
-    ed = _make_aware(end_date)
-    rs = _make_aware(registration_start)
-    re = _make_aware(registration_end)
+    sd = to_aware(start_date)
+    ed = to_aware(end_date)
+    rs = to_aware(registration_start)
+    re = to_aware(registration_end)
 
     if sd >= ed:
         raise HTTPException(

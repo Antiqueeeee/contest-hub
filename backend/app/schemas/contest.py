@@ -1,5 +1,6 @@
 from datetime import datetime, date, timezone
 from pydantic import BaseModel, Field, model_validator, computed_field
+from app.utils.timezone import to_aware
 
 
 class ContestGroupIn(BaseModel):
@@ -115,13 +116,7 @@ class ContestOut(BaseModel):
         if self.status != "open":
             return False
         now = datetime.now(timezone.utc)
-        reg_start = self.registration_start
-        reg_end = self.registration_end
-        if reg_start.tzinfo is None:
-            reg_start = reg_start.replace(tzinfo=timezone.utc)
-        if reg_end.tzinfo is None:
-            reg_end = reg_end.replace(tzinfo=timezone.utc)
-        return reg_start <= now <= reg_end
+        return to_aware(self.registration_start) <= now <= to_aware(self.registration_end)
 
     @computed_field
     @property
@@ -130,10 +125,7 @@ class ContestOut(BaseModel):
         if self.status != "open":
             return False
         now = datetime.now(timezone.utc)
-        reg_start = self.registration_start
-        if reg_start.tzinfo is None:
-            reg_start = reg_start.replace(tzinfo=timezone.utc)
-        return now < reg_start
+        return now < to_aware(self.registration_start)
 
 
 class ContestListOut(BaseModel):
