@@ -166,17 +166,13 @@ export default function ContestEditPage() {
             <div className="space-y-1"><Label>报名开始 <span className="text-destructive">*</span></Label><Input type="datetime-local" value={regStart} onChange={e => setRegStart(e.target.value)} /></div>
             <div className="space-y-1"><Label>报名截止 <span className="text-destructive">*</span></Label><Input type="datetime-local" value={regEnd} onChange={e => setRegEnd(e.target.value)} /></div>
           </div>
-          <details className="pt-2">
-            <summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none">高级设置</summary>
-            <div className="space-y-1 mt-3 p-3 bg-muted/30 rounded-lg">
-              <Label>时区</Label>
-              <select value={timezone} onChange={e => setTimezone(e.target.value)}
-                className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
-                {TZ_OPTIONS.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
-              </select>
-              <p className="text-xs text-muted-foreground">所有比赛时间均以此为时区基准，默认北京时间 (UTC+8)</p>
-            </div>
-          </details>
+          <div className="space-y-1 pt-2">
+            <Label className="text-muted-foreground">时区</Label>
+            <select value={timezone} onChange={e => setTimezone(e.target.value)}
+              className="w-full max-w-xs h-9 rounded-md border border-input bg-background px-3 text-sm text-muted-foreground">
+              {TZ_OPTIONS.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
+            </select>
+          </div>
         </CardContent>
       </Card>
 
