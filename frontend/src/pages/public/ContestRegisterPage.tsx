@@ -4,6 +4,7 @@ import { api } from '@/api/client'
 import { useContestantAuth, getCToken, contestantApi } from '@/hooks/useContestantAuth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -99,7 +100,21 @@ export default function ContestRegisterPage() {
           )}
           {contest.fields?.map(f => (
             <div key={f.id} className="space-y-1"><Label>{f.field_name} {f.is_required && <span className="text-destructive">*</span>}</Label>
-              <Input value={customValues[f.id] ?? ''} onChange={e => setCustomValues(prev => ({ ...prev, [f.id]: e.target.value }))} />
+              {f.field_type === 'select' && f.options?.length ? (
+                <select value={customValues[f.id] ?? ''} onChange={e => setCustomValues(prev => ({ ...prev, [f.id]: e.target.value }))}
+                  className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
+                  <option value="">请选择{f.field_name}</option>
+                  {f.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                </select>
+              ) : f.field_type === 'textarea' ? (
+                <Textarea value={customValues[f.id] ?? ''} onChange={e => setCustomValues(prev => ({ ...prev, [f.id]: e.target.value }))} />
+              ) : (
+                <Input
+                  type={f.field_type === 'number' ? 'number' : f.field_type === 'date' ? 'date' : 'text'}
+                  value={customValues[f.id] ?? ''}
+                  onChange={e => setCustomValues(prev => ({ ...prev, [f.id]: e.target.value }))}
+                />
+              )}
               {errors[`f${f.id}`] && <p className="text-sm text-destructive">{errors[`f${f.id}`]}</p>}
             </div>
           ))}
