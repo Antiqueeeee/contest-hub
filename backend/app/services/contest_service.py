@@ -43,7 +43,11 @@ def _derive_status(contest: Contest, now: datetime) -> ContestStatus:
 
 
 def _auto_transition(contest: Contest) -> None:
-    """Forward-only auto-update based on current time and key dates."""
+    """Forward-only auto-update based on current time and key dates.
+    Only advances time-driven states; never touches cancelled contests."""
+    if contest.status == ContestStatus.cancelled:
+        return
+
     now = datetime.now(timezone.utc)
     derived = _derive_status(contest, now)
 
