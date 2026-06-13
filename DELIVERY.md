@@ -49,9 +49,10 @@ bash scripts/load-images.sh
 ### 3. 配置环境变量
 
 ```bash
-cp .env.example .env
-nano .env
+bash scripts/setup-env.sh
 ```
+
+脚本会自动补全缺失的必填配置项（`DB_PASSWORD`、`JWT_SECRET`、`ENCRYPTION_KEY`）。
 
 ### 4. 按需修改代码
 

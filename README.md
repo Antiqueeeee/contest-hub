@@ -84,16 +84,17 @@ cd /opt && tar -xzf contest-hub.tar.gz && cd contest-hub
 ### 3. 配置环境变量
 
 ```bash
-cp .env.example .env
-nano .env  # 修改以下内容：
+bash scripts/setup-env.sh
 ```
 
-| 变量 | 说明 |
-|------|------|
-| `DB_PASSWORD` | 数据库密码，务必修改 |
-| `JWT_SECRET` | JWT 签名密钥，用 `openssl rand -hex 32` 生成 |
-| `ALLOWED_ORIGINS` | 改为你的域名，如 `http://contest.example.com` |
-| `PORT` | 前端暴露端口，默认 80 |
+脚本会自动完成：
+- 首次运行时从 `.env.example` 创建 `.env`
+- 检测并自动生成缺失的密钥（`JWT_SECRET`、`ENCRYPTION_KEY`）
+- 提示输入 `DB_PASSWORD`
+
+每次 `git pull` 拉取新代码后也可运行此脚本，自动补全新增的必填配置项，不会覆盖已有值。
+
+> 手动配置请参考 `.env.example` 文件内注释。
 
 ### 4. 启动服务
 
@@ -131,22 +132,41 @@ docker compose exec db pg_dump -U contest contest_hub > backup.sql
 0 3 * * * cd /opt/contest-hub && docker compose exec -T db pg_dump -U contest contest_hub > /backup/contest_$(date +\%Y\%m\%d).sql
 ```
 
-### 配置 HTTPS（可选）
+### 配置 HTTPS
+
+项目内 nginx 运行在 HTTP 80 端口。如需 HTTPS，在服务器外层 nginx 配置 SSL 证书并反向代理：
+
+```nginx
+# /etc/nginx/sites-available/contest-hub
+server {
+    listen 443 ssl http2;
+    server_name contest.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/contest.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/contest.example.com/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:80;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;   # ← 关键：告知后端原始协议
+    }
+}
+
+server {
+    listen 80;
+    server_name contest.example.com;
+    return 301 https://$server_name$request_uri;
+}
+```
+
+**外层 nginx 必须设置 `X-Forwarded-Proto: https`**，项目内的 nginx 会自动透传，后端据此正确处理 CORS 和重定向。
+
+使用 Let's Encrypt 免费获取证书：
 
 ```bash
-sudo apt install nginx certbot python3-certbot-nginx
-
-# Nginx 配置 /etc/nginx/sites-available/contest-hub:
-# server {
-#     listen 80;
-#     server_name contest.example.com;
-#     location / {
-#         proxy_pass http://127.0.0.1:80;
-#         proxy_set_header Host $host;
-#         proxy_set_header X-Real-IP $remote_addr;
-#     }
-# }
-
+sudo apt install certbot python3-certbot-nginx
 sudo certbot --nginx -d contest.example.com
 ```
 
@@ -193,8 +213,7 @@ cd /opt && tar -xzf contest-hub.tar.gz && cd contest-hub
 bash docker-images/load-images.sh
 
 # 3. 配置环境变量
-cp .env.example .env
-nano .env  # 修改 DB_PASSWORD、JWT_SECRET 等
+bash scripts/setup-env.sh
 
 # 4. 构建并启动（全程无需外网）
 docker compose build      # 旧版: docker-compose build
@@ -283,8 +302,9 @@ Environment="DB_USER=contest"
 Environment="DB_PASSWORD=contest123"
 Environment="DB_NAME=contest_hub"
 Environment="JWT_SECRET=your-secret-here"
+Environment="ENCRYPTION_KEY=your-fernet-key-here"
 Environment="ALLOWED_ORIGINS=http://your-domain.com"
-ExecStart=/opt/contest-hub/backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+ExecStart=/opt/contest-hub/backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --proxy-headers
 Restart=always
 
 [Install]
@@ -330,6 +350,7 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 ```
@@ -374,7 +395,7 @@ docker run -d \
 cd backend
 pip install -r requirements.txt
 python seed.py              # 创建管理员账号
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --proxy-headers
 ```
 
 ### 3. 启动前端
@@ -396,7 +417,7 @@ npm run dev
 
 ### 选手端
 
-- 注册登录（手机号 + 密码）
+- 注册登录（邮箱 + 密码）
 - 浏览赛事信息、新闻通知
 - 在线报名参赛
 - 查询个人成绩
@@ -445,9 +466,34 @@ npm run dev
 | `DB_HOST` | `localhost` | 数据库主机地址 |
 | `DB_PORT` | `5432` | 数据库端口 |
 | `DB_USER` | `contest` | 数据库用户名 |
-| `DB_PASSWORD` | `contest123` | 数据库密码（支持特殊字符，自动编码） |
+| `DB_PASSWORD` | —（必填） | 数据库密码 |
 | `DB_NAME` | `contest_hub` | 数据库名 |
-| `JWT_SECRET` | `dev-secret-change-in-production` | JWT 签名密钥 |
+| `JWT_SECRET` | —（必填） | JWT 签名密钥 |
+| `ENCRYPTION_KEY` | —（必填） | PII 加密密钥（Fernet 格式），用于加密存储身份证号和手机号 |
 | `JWT_EXPIRE_MINUTES` | `120` | Token 有效期（分钟） |
+| `ALLOWED_ORIGINS` | `http://localhost` | CORS 允许的来源，逗号分隔 |
 | `EXPORT_DIR` | `./exports` | 导出文件目录 |
 | `EXPORT_RETENTION_DAYS` | `7` | 导出文件保留天数 |
+| `EXPORT_MAX_ROWS` | `50000` | 单次导出最大行数 |
+
+### 生成必填密钥
+
+```bash
+# JWT 签名密钥
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+
+# PII 加密密钥（Fernet）
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+### PII 数据保护
+
+系统对以下敏感个人信息做加密存储和 API 脱敏：
+
+| 字段 | 存储方式 | API 返回格式 |
+|------|---------|------------|
+| 身份证号 | AES 加密（Fernet） | `3201****1234` |
+| 手机号 | AES 加密（Fernet） | `138****5678` |
+| 密码 | bcrypt 单向哈希 | 永不返回 |
+
+导出 Excel 时身份证号自动脱敏。
