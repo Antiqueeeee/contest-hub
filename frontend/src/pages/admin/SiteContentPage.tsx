@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react'
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
+import { Lightbulb } from 'lucide-react'
 
 const pages = [
   { key: 'about', label: '平台介绍' },
@@ -56,37 +57,33 @@ const DEFAULTS: Record<string, string> = {
 
 const GUIDES: Record<string, { purpose: string; prompt: string }> = {
   about: {
-    purpose: '介绍平台定位、功能特色与优势，让访客快速了解平台能力。',
+    purpose: '介绍平台定位、功能特色与优势。',
     prompt: `你是一个网页内容编辑。请为「竞赛信息发布平台」的"关于我们"页面生成 HTML 内容。
 
 要求：
 - 使用简单的 HTML 标签（h1, h2, h3, p, ul, li, strong），不要用 class 或 style
-- 包含以下板块：
-  1. 平台简介（1-2 段）
-  2. 核心功能（列表）
-  3. 优势或特色（列表）
+- 包含以下板块：平台简介、核心功能、优势或特色
 - 语言简洁专业，面向参赛选手和赛事主办方
 - 输出纯 HTML，不使用 markdown 代码块包裹`,
   },
   faq: {
-    purpose: '以问答形式列出选手常见问题，减少重复咨询。',
+    purpose: '以问答形式列出选手常见问题。',
     prompt: `你是一个网页内容编辑。请为「竞赛信息发布平台」的"常见问题"页面生成 HTML 内容。
 
 要求：
 - 使用简单的 HTML 标签（h1, h3, p），不要用 class 或 style
-- 每个问题用 <h3>Q: 问题内容</h3> 格式
-- 每个回答用 <p>回答内容</p> 格式
-- 至少覆盖以下主题：报名流程、材料准备、成绩查询、密码找回、信息修改
+- 每个问题用 <h3>Q: 问题内容</h3>，回答用 <p>回答内容</p>
+- 至少覆盖：报名流程、材料准备、成绩查询、密码找回、信息修改
 - 输出纯 HTML，不使用 markdown 代码块包裹`,
   },
   contact: {
-    purpose: '提供联系方式与服务时间，建立访客信任。',
+    purpose: '提供联系方式与服务时间。',
     prompt: `你是一个网页内容编辑。请为「竞赛信息发布平台」的"联系我们"页面生成 HTML 内容。
 
 要求：
 - 使用简单的 HTML 标签（h1, p, ul, li, strong, hr），不要用 class 或 style
 - 至少包含：邮箱、电话、地址、工作时间
-- 末尾可添加一句收尾语（如"我们会在 X 个工作日内回复"）
+- 末尾可添加收尾语
 - 输出纯 HTML，不使用 markdown 代码块包裹`,
   },
 }
@@ -116,71 +113,69 @@ export default function SiteContentPage() {
   }
 
   const guide = GUIDES[pageKey]
-  const pageLabel = pages.find(p => p.key === pageKey)?.label || ''
 
   return (
     <div className="space-y-4 max-w-3xl">
       <h1 className="text-2xl font-bold">站点内容管理</h1>
 
-      {/* AI 方法论指南 */}
-      <Card className={showGuide ? '' : 'border-dashed'}>
-        <div
-          className="p-3 cursor-pointer select-none"
-          onClick={() => setShowGuide(!showGuide)}
-        >
-          <h3 className="text-sm font-medium flex items-center gap-2">
-            <span>{showGuide ? '▾' : '▸'}</span>
-            AI 内容生成指南（点击展开）
-          </h3>
-        </div>
-        {showGuide && (
-          <CardContent className="space-y-4 border-t pt-4">
-            <div className="space-y-2">
-              <p className="text-sm font-medium">{pageLabel} — 页面定位</p>
-              <p className="text-sm text-muted-foreground">{guide.purpose}</p>
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium">方式一：用 AI 生成</p>
-              <p className="text-xs text-muted-foreground mb-1">复制以下提示词，发给 ChatGPT / 通义千问 / 豆包等 AI 工具</p>
-              <pre className="bg-muted p-3 rounded-md text-xs overflow-auto whitespace-pre-wrap">{guide.prompt}</pre>
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium">方式二：使用默认模板</p>
-              <p className="text-xs text-muted-foreground mb-1">也可以直接使用我们预置的模板，或复制给 AI 让它在此基础上修改</p>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setContent(DEFAULTS[pageKey])}>填入编辑框</Button>
-                <Button variant="outline" size="sm" onClick={() => navigator.clipboard.writeText(DEFAULTS[pageKey])}>复制模板</Button>
-              </div>
-              <pre className="bg-muted p-3 rounded-md text-xs overflow-auto whitespace-pre-wrap max-h-48">{DEFAULTS[pageKey]}</pre>
-            </div>
-          </CardContent>
-        )}
-      </Card>
-
       <Card>
-        <CardContent className="space-y-4 pt-6">
-          <div className="space-y-1">
-            <Label>选择页面</Label>
-            <select value={pageKey} onChange={e => setPageKey(e.target.value)} className="h-10 rounded-md border border-input bg-background px-3 text-sm w-48">
-              {pages.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
-            </select>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">编辑页面内容</CardTitle>
+            <div className="flex items-center gap-2">
+              <select value={pageKey} onChange={e => setPageKey(e.target.value)} className="h-8 rounded-md border border-input bg-background px-2 text-xs">
+                {pages.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
+              </select>
+            </div>
           </div>
-          <div className="space-y-1">
-            <Label>内容（支持 HTML）</Label>
-            {loading ? (
-              <p className="text-sm text-muted-foreground">加载中...</p>
-            ) : (
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {loading ? (
+            <p className="text-sm text-muted-foreground py-8 text-center">加载中...</p>
+          ) : (
+            <>
               <Textarea
                 value={content}
                 onChange={e => setContent(e.target.value)}
-                className="min-h-[400px] font-mono text-sm"
+                className="min-h-[420px] font-mono text-sm"
                 placeholder="<h1>标题</h1><p>正文内容...</p>"
               />
-            )}
-          </div>
-          <Button onClick={handleSave} disabled={saving}>{saving ? '保存中...' : '保存并发布'}</Button>
+              <div className="flex items-center justify-between">
+                <Button onClick={handleSave} disabled={saving}>{saving ? '保存中...' : '保存并发布'}</Button>
+                <button
+                  onClick={() => setShowGuide(!showGuide)}
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Lightbulb className="h-3 w-3" />
+                  AI 生成参考
+                </button>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
+
+      {/* AI guide — subtle, below the fold */}
+      {showGuide && (
+        <div className="rounded-lg border border-dashed bg-muted/30 p-4 space-y-3 text-sm">
+          <p className="text-xs text-muted-foreground">
+            <strong className="text-foreground">{pages.find(p => p.key === pageKey)?.label}</strong> — {guide.purpose}
+          </p>
+          <div>
+            <p className="text-xs font-medium mb-1">AI 生成提示词（复制发给 ChatGPT / 通义千问 / 豆包）</p>
+            <pre className="bg-background border rounded-md p-2.5 text-xs overflow-auto whitespace-pre-wrap text-muted-foreground">{guide.prompt}</pre>
+          </div>
+          <div>
+            <p className="text-xs font-medium mb-1">默认模板</p>
+            <div className="flex gap-2 mb-1.5">
+              <Button variant="secondary" size="sm" onClick={() => { setContent(DEFAULTS[pageKey]); setShowGuide(false) }}>填入编辑框</Button>
+              <Button variant="ghost" size="sm" onClick={() => navigator.clipboard.writeText(DEFAULTS[pageKey])}>复制模板</Button>
+              <Button variant="ghost" size="sm" onClick={() => navigator.clipboard.writeText(guide.prompt)}>复制提示词</Button>
+            </div>
+            <pre className="bg-background border rounded-md p-2.5 text-xs overflow-auto whitespace-pre-wrap max-h-40 text-muted-foreground">{DEFAULTS[pageKey]}</pre>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
