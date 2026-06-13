@@ -4,6 +4,7 @@ from app.database import get_db
 from app.middleware.contestant_auth import get_current_contestant
 from app.schemas.contestant import ContestantRegister, ContestantLogin, ContestantProfileUpdate
 from app.services import contestant_service
+from app.utils.crypto import mask_id_number
 
 router = APIRouter(prefix="/api", tags=["选手"])
 
@@ -21,16 +22,15 @@ async def login(data: ContestantLogin, db: AsyncSession = Depends(get_db)):
 @router.get("/contestant/profile")
 async def get_profile(current: dict = Depends(get_current_contestant), db: AsyncSession = Depends(get_db)):
     c = await contestant_service.get_contestant_profile(db, current["contestant_id"])
-    # Full id_number returned — the user is viewing their own data
     return {"id": c.id, "name": c.name, "email": c.email,
-            "id_number": c.id_number, "organization": c.organization}
+            "id_number": mask_id_number(c.id_number), "organization": c.organization}
 
 
 @router.put("/contestant/profile")
 async def update_profile(data: ContestantProfileUpdate, current: dict = Depends(get_current_contestant), db: AsyncSession = Depends(get_db)):
     c = await contestant_service.update_contestant_profile(db, current["contestant_id"], data)
     return {"id": c.id, "name": c.name, "email": c.email,
-            "id_number": c.id_number, "organization": c.organization}
+            "id_number": mask_id_number(c.id_number), "organization": c.organization}
 
 
 @router.get("/contestant/registrations")

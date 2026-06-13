@@ -17,6 +17,23 @@ def _gen_registration_number(contest_id: int, seq: int) -> str:
 
 
 async def register(db: AsyncSession, data: RegistrationCreate, contestant_id: int | None = None) -> Registration:
+    # ── Resolve id_number ──────────────────────────────────────────
+    # Logged-in users: fetch from account (full id_number never leaves backend).
+    # Anonymous users: use the value they submitted in the form.
+    from app.models.contestant import Contestant
+
+    id_number = data.id_number
+    if contestant_id is not None:
+        c_result = await db.execute(select(Contestant).where(Contestant.id == contestant_id))
+        contestant_row = c_result.scalar_one_or_none()
+        if contestant_row:
+            id_number = contestant_row.id_number  # EncryptedString auto-decrypts
+        elif not id_number:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="请提供身份证号")
+
+    if not id_number:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="请提供身份证号")
+
     # Validate contest is open
     result = await db.execute(select(Contest).where(Contest.id == data.contest_id))
     contest = result.scalar_one_or_none()
@@ -64,7 +81,7 @@ async def register(db: AsyncSession, data: RegistrationCreate, contestant_id: in
     )
     for reg in existing_regs.scalars().all():
         stored_encrypted = reg.form_data.get("id_number", "")
-        if stored_encrypted and decrypt_value(stored_encrypted) == data.id_number:
+        if stored_encrypted and decrypt_value(stored_encrypted) == id_number:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该身份证号已在此赛事此组别报名")
 
     # Generate registration number
@@ -75,7 +92,7 @@ async def register(db: AsyncSession, data: RegistrationCreate, contestant_id: in
     form_data = {
         "name": data.name,
         "email": data.email,
-        "id_number": encrypt_value(data.id_number),
+        "id_number": encrypt_value(id_number),
     }
     if data.organization:
         form_data["organization"] = data.organization

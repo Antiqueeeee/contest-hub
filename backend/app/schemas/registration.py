@@ -8,7 +8,9 @@ class RegistrationCreate(BaseModel):
     group_id: int | None = None
     name: str = Field(min_length=2, max_length=20)
     email: str = Field(max_length=255)
-    id_number: str = Field(min_length=18, max_length=18)
+    # Optional for logged-in users (backend fetches from account).
+    # Required for anonymous public registration.
+    id_number: str | None = Field(default=None, min_length=18, max_length=18)
     organization: str | None = Field(default=None, max_length=200)
     custom_fields: dict[str, str] = {}
     privacy_agreed: bool = True

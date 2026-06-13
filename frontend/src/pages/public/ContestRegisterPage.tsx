@@ -51,7 +51,7 @@ export default function ContestRegisterPage() {
     const e: Record<string, string> = {}
     if (!name || name.length < 2 || name.length > 20) e.name = '请输入 2-20 位的真实姓名'
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = '请输入正确的邮箱地址'
-    if (!idNumber || !/^\d{17}[\dXx]$/.test(idNumber)) e.idNumber = '请输入正确的18位身份证号'
+    if (!isLoggedIn && (!idNumber || !/^\d{17}[\dXx]$/.test(idNumber))) e.idNumber = '请输入正确的18位身份证号'
     if (!privacyAgreed) e.privacy = '请阅读并同意隐私政策'
     contest.fields?.filter(f => f.is_required).forEach(f => { if (!customValues[f.id]?.trim()) e[`f${f.id}`] = `请填写${f.field_name}` })
     setErrors(e); return Object.keys(e).length === 0
@@ -63,7 +63,7 @@ export default function ContestRegisterPage() {
       const cf: Record<string, string> = {}
       contest.fields?.forEach(f => { if (customValues[f.id]) cf[f.field_name] = customValues[f.id] })
       const res = await contestantApi().post<{ registration_number: string }>(`/public/contests/${contest.id}/register`, {
-        contest_id: contest.id, group_id: groupId ? Number(groupId) : null, name, email, id_number: idNumber, organization: organization || null, custom_fields: cf, privacy_agreed: privacyAgreed,
+        contest_id: contest.id, group_id: groupId ? Number(groupId) : null, name, email, id_number: isLoggedIn ? null : idNumber, organization: organization || null, custom_fields: cf, privacy_agreed: privacyAgreed,
       })
       navigate(`/contests/${contest.id}/register/success`, { state: { registrationNumber: res.registration_number, contestTitle: contest.title, name } })
     } catch (e) { alert(e instanceof Error ? e.message : '报名失败') }
@@ -84,7 +84,14 @@ export default function ContestRegisterPage() {
           )}
           <div className="space-y-1"><Label>姓名 <span className="text-destructive">*</span></Label><Input value={name} onChange={e => { setName(e.target.value); setErrors({}) }} placeholder="请输入真实姓名" disabled={isLoggedIn} />{errors.name && <p className="text-sm text-destructive">{errors.name}</p>}</div>
           <div className="space-y-1"><Label>邮箱 <span className="text-destructive">*</span></Label><Input value={email} onChange={e => { setEmail(e.target.value); setErrors({}) }} placeholder="请输入邮箱地址" disabled={isLoggedIn} />{errors.email && <p className="text-sm text-destructive">{errors.email}</p>}</div>
-          <div className="space-y-1"><Label>身份证号 <span className="text-destructive">*</span></Label><Input value={idNumber} onChange={e => { setIdNumber(e.target.value); setErrors({}) }} placeholder="18位身份证号码" maxLength={18} disabled={isLoggedIn} />{errors.idNumber && <p className="text-sm text-destructive">{errors.idNumber}</p>}</div>
+          <div className="space-y-1"><Label>身份证号 <span className="text-destructive">*</span></Label>
+            {isLoggedIn ? (
+              <p className="h-10 flex items-center text-sm text-muted-foreground">{idNumber || '—'}</p>
+            ) : (
+              <Input value={idNumber} onChange={e => { setIdNumber(e.target.value); setErrors({}) }} placeholder="18位身份证号码" maxLength={18} />
+            )}
+            {errors.idNumber && <p className="text-sm text-destructive">{errors.idNumber}</p>}
+          </div>
           <div className="space-y-1"><Label>学校/单位</Label><Input value={organization} onChange={e => { setOrganization(e.target.value); setErrors({}) }} placeholder="选填" maxLength={200} /></div>
           {contest.groups?.length > 0 && (
             <div className="space-y-1"><Label>参赛组别</Label>

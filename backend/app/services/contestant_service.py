@@ -28,8 +28,8 @@ def create_contestant_token(contestant_id: int) -> str:
 def _build_auth_response(contestant: Contestant) -> dict:
     """Build the standard login/register response dict.
 
-    id_number is returned in full — the user just provided it during
-    registration/login and the frontend may need it to pre-fill forms.
+    id_number is masked — after registration the full value should not
+    leave the backend.  Contest registration uses the DB-stored value.
     """
     token = create_contestant_token(contestant.id)
     return {
@@ -38,7 +38,7 @@ def _build_auth_response(contestant: Contestant) -> dict:
             "id": contestant.id,
             "name": contestant.name,
             "email": contestant.email,
-            "id_number": contestant.id_number,
+            "id_number": mask_id_number(contestant.id_number),
             "organization": contestant.organization,
         },
     }
