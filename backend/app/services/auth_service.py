@@ -8,6 +8,7 @@ from fastapi import HTTPException, status
 from app.config import get_settings
 from app.models.user import User, UserStatus
 from app.schemas.user import LoginRequest, UserCreate, UserUpdate
+from app.utils.crypto import mask_phone
 
 
 def hash_password(password: str) -> str:
@@ -42,7 +43,8 @@ async def authenticate(db: AsyncSession, req: LoginRequest) -> dict:
     return {
         "access_token": token,
         "token_type": "bearer",
-        "user": {"id": user.id, "username": user.username, "name": user.name, "phone": user.phone,
+        "user": {"id": user.id, "username": user.username, "name": user.name,
+                 "phone": mask_phone(user.phone),
                  "status": user.status.value, "last_login_at": user.last_login_at, "created_at": user.created_at}
     }
 

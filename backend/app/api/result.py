@@ -3,10 +3,11 @@ from fastapi import APIRouter, Depends, Query, UploadFile, File, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from openpyxl import load_workbook
+from openpyxl.worksheet.worksheet import Worksheet
 
 from app.database import get_db
 from app.middleware.auth import get_current_user
-from app.schemas.result import ResultCreate, ResultOut, ResultQueryRequest
+from app.schemas.result import ResultCreate, ResultOut, ResultQueryRequest, ResultFilter
 from app.services import result_service
 
 admin_router = APIRouter(prefix="/api/admin/results", tags=["成绩管理"])
@@ -24,7 +25,11 @@ async def list_results(
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    items, total = await result_service.list_results(db, contest_id, group_id, is_published, keyword, page, page_size)
+    filters = ResultFilter(
+        contest_id=contest_id, group_id=group_id, is_published=is_published,
+        keyword=keyword, page=page, page_size=page_size,
+    )
+    items, total = await result_service.list_results(db, filters)
     return {
         "items": [
             {
@@ -93,6 +98,102 @@ async def download_template(
                              headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded}"})
 
 
+# ── Import helpers ───────────────────────────────────────────────
+
+
+def _parse_import_headers(ws: Worksheet) -> tuple[list[tuple[int, str]], int, int, int]:
+    """Parse the header row of an import worksheet.
+
+    Returns:
+        (score_cols, total_col, rank_col, award_col) where score_cols is [(col_index, col_name), ...].
+    """
+    headers = [str(cell.value).strip() if cell.value else "" for cell in ws[1]]
+    non_score = {"报名编号", "姓名", "总分", "排名", "奖项"}
+    score_cols = []
+    total_col = -1
+    rank_col = -1
+    award_col = -1
+    for i, h in enumerate(headers):
+        if h == "总分":
+            total_col = i
+        elif h == "排名":
+            rank_col = i
+        elif h == "奖项":
+            award_col = i
+        elif h not in non_score:
+            score_cols.append((i, h))
+    return score_cols, total_col, rank_col, award_col
+
+
+async def _process_import_row(
+    db: AsyncSession, row: tuple, row_idx: int, contest_id: int,
+    score_cols: list[tuple[int, str]], total_col: int, rank_col: int, award_col: int,
+) -> tuple[bool, str]:
+    """Process a single import row. Returns (success, error_message)."""
+    from sqlalchemy import select
+    from app.models.registration import Registration
+    from app.models.contest import Award
+
+    reg_number = str(row[0]).strip()
+
+    r = await db.execute(select(Registration).where(
+        Registration.registration_number == reg_number,
+        Registration.deleted_at.is_(None),
+    ))
+    reg = r.scalar_one_or_none()
+    if not reg:
+        return False, f"报名编号 {reg_number} 不存在"
+
+    # Build scores dict from dynamic columns
+    scores = {}
+    for col_idx, col_name in score_cols:
+        if len(row) > col_idx and row[col_idx] is not None:
+            try:
+                scores[col_name] = float(row[col_idx])
+            except (ValueError, TypeError):
+                return False, f"第{col_idx + 1}列「{col_name}」不是有效数字"
+
+    # Total score: use provided value or sum of score columns
+    try:
+        total = float(row[total_col]) if total_col >= 0 and len(row) > total_col and row[total_col] is not None else sum(scores.values())
+    except (ValueError, TypeError):
+        return False, "总分不是有效数字"
+
+    # Rank
+    rank = None
+    if rank_col >= 0 and len(row) > rank_col and row[rank_col] is not None:
+        try:
+            rank = int(row[rank_col])
+        except (ValueError, TypeError):
+            return False, "排名不是有效整数"
+
+    # Award
+    award_id = None
+    if award_col >= 0 and len(row) > award_col and row[award_col] is not None:
+        award_name = str(row[award_col]).strip()
+        if award_name:
+            a = await db.execute(select(Award).where(Award.contest_id == contest_id, Award.name == award_name))
+            award = a.scalar_one_or_none()
+            if award:
+                award_id = award.id
+            else:
+                return False, f"奖项「{award_name}」不存在"
+
+    data = ResultCreate(
+        contest_id=contest_id,
+        registration_id=reg.id,
+        scores=scores,
+        total_score=total,
+        rank=rank,
+        award_id=award_id,
+    )
+    await result_service.create_or_update_result(db, data)
+    return True, ""
+
+
+# ── Import endpoint ──────────────────────────────────────────────
+
+
 @admin_router.post("/import")
 async def import_results(
     contest_id: int = Query(...),
@@ -100,6 +201,7 @@ async def import_results(
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
+    """Import results from an .xlsx file. Expects header row with 报名编号, 姓名, score columns, 总分, 排名, 奖项."""
     if not file.filename or not file.filename.endswith(".xlsx"):
         raise HTTPException(status_code=400, detail="请上传 .xlsx 格式文件")
 
@@ -107,66 +209,22 @@ async def import_results(
     wb = load_workbook(io.BytesIO(contents))
     ws = wb.active
 
-    # Read header row
-    headers = [str(cell.value).strip() if cell.value else "" for cell in ws[1]]
-    # Columns: 报名编号 | 姓名 | [score categories ...] | 总分 | 排名 | 奖项
-    non_score = {"报名编号", "姓名", "总分", "排名", "奖项"}
-    score_cols = []
-    total_col = -1
-    rank_col = -1
-    award_col = -1
-    for i, h in enumerate(headers):
-        if h == "总分": total_col = i
-        elif h == "排名": rank_col = i
-        elif h == "奖项": award_col = i
-        elif h not in non_score:
-            score_cols.append((i, h))
+    score_cols, total_col, rank_col, award_col = _parse_import_headers(ws)
 
     success_count = 0
     errors = []
 
     for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), 2):
         if not row[0]:
-            continue
-        reg_number = str(row[0]).strip()
-        try:
-            from sqlalchemy import select
-            from app.models.registration import Registration
-            r = await db.execute(select(Registration).where(Registration.registration_number == reg_number, Registration.deleted_at.is_(None)))
-            reg = r.scalar_one_or_none()
-            if not reg:
-                errors.append({"row": row_idx, "error": f"报名编号 {reg_number} 不存在"})
-                continue
+            continue  # Skip empty rows
 
-            scores = {}
-            for col_idx, col_name in score_cols:
-                if len(row) > col_idx and row[col_idx] is not None:
-                    scores[col_name] = float(row[col_idx])
-
-            total = float(row[total_col]) if total_col >= 0 and len(row) > total_col and row[total_col] is not None else sum(scores.values())
-            rank = int(row[rank_col]) if rank_col >= 0 and len(row) > rank_col and row[rank_col] is not None else None
-            award_name = str(row[award_col]).strip() if award_col >= 0 and len(row) > award_col and row[award_col] is not None else None
-
-            award_id = None
-            if award_name:
-                from app.models.contest import Award
-                a = await db.execute(select(Award).where(Award.contest_id == contest_id, Award.name == award_name))
-                award = a.scalar_one_or_none()
-                if award:
-                    award_id = award.id
-
-            data = ResultCreate(
-                contest_id=contest_id,
-                registration_id=reg.id,
-                scores=scores,
-                total_score=total,
-                rank=rank,
-                award_id=award_id,
-            )
-            await result_service.create_or_update_result(db, data)
+        ok, error_msg = await _process_import_row(
+            db, row, row_idx, contest_id, score_cols, total_col, rank_col, award_col,
+        )
+        if ok:
             success_count += 1
-        except Exception as e:
-            errors.append({"row": row_idx, "error": str(e)})
+        else:
+            errors.append({"row": row_idx, "error": error_msg})
 
     return {"success_count": success_count, "error_count": len(errors), "errors": errors[:20]}
 

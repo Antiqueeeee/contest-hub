@@ -7,6 +7,7 @@ from app.models.contest import Contest, ContestGroup, ContestStatus
 from app.models.registration import Registration
 from app.schemas.registration import RegistrationCreate
 from app.utils.timezone import to_aware
+from app.utils.crypto import encrypt_value, decrypt_value
 
 
 def _gen_registration_number(contest_id: int, seq: int) -> str:
@@ -51,28 +52,34 @@ async def register(db: AsyncSession, data: RegistrationCreate, contestant_id: in
         if group.max_participants > 0 and count_result.scalar() >= group.max_participants:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该组别名额已满")
 
-    # Check duplicate id_number+contest+group
-    dup = await db.execute(
+    # Check duplicate id_number — fetch existing registrations and compare decrypted values
+    existing_regs = await db.execute(
         select(Registration).where(
             and_(
                 Registration.contest_id == data.contest_id,
                 Registration.group_id == data.group_id,
                 Registration.deleted_at.is_(None),
-                Registration.form_data["id_number"].as_string() == data.id_number,
             )
         )
     )
-    if dup.scalar_one_or_none():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该身份证号已在此赛事此组别报名")
+    for reg in existing_regs.scalars().all():
+        stored_encrypted = reg.form_data.get("id_number", "")
+        if stored_encrypted and decrypt_value(stored_encrypted) == data.id_number:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该身份证号已在此赛事此组别报名")
 
     # Generate registration number
     count_r = await db.execute(select(func.count(Registration.id)).where(Registration.contest_id == data.contest_id))
     seq = (count_r.scalar() or 0) + 1
 
-    # Build form_data
-    form_data = {"name": data.name, "email": data.email, "id_number": data.id_number}
+    # Build form_data — encrypt id_number before storing
+    form_data = {
+        "name": data.name,
+        "email": data.email,
+        "id_number": encrypt_value(data.id_number),
+    }
     if data.organization:
         form_data["organization"] = data.organization
+    # Custom fields are stored as-is (caller is responsible for not putting PII in them)
     form_data.update(data.custom_fields)
 
     reg = Registration(
@@ -134,6 +141,7 @@ async def soft_delete_registration(db: AsyncSession, reg_id: int):
 async def get_registrations_for_export(
     db: AsyncSession, contest_id: int, group_ids: list[int] | None = None
 ) -> list[Registration]:
+    """Fetch registrations for export.  form_data.id_number is still encrypted at this point."""
     query = select(Registration).where(Registration.contest_id == contest_id, Registration.deleted_at.is_(None))
     if group_ids:
         query = query.where(Registration.group_id.in_(group_ids))

@@ -11,18 +11,24 @@ class Settings(BaseSettings):
     db_host: str = "localhost"
     db_port: int = 5432
     db_user: str = "contest"
-    db_password: str = "contest123"
+    db_password: str = ""          # REQUIRED — set via .env or environment variable
     db_name: str = "contest_hub"
 
     @property
     def database_url(self) -> str:
+        if not self.db_password:
+            raise ValueError("db_password 未配置，请在 .env 文件或环境变量中设置")
         pwd = quote_plus(self.db_password)
         return f"postgresql+asyncpg://{self.db_user}:{pwd}@{self.db_host}:{self.db_port}/{self.db_name}"
 
     # JWT
-    jwt_secret: str = "dev-secret-change-in-production"
+    jwt_secret: str = ""           # REQUIRED — set via .env or environment variable
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 120
+
+    # Encryption key for PII fields (id_number, phone).
+    # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    encryption_key: str = ""       # REQUIRED
 
     # CORS
     allowed_origins: str = "http://localhost:5173"
@@ -37,4 +43,11 @@ class Settings(BaseSettings):
 
 @lru_cache()
 def get_settings() -> Settings:
-    return Settings()
+    settings = Settings()
+    # Validate required secrets at startup so misconfiguration fails fast
+    if not settings.jwt_secret:
+        raise ValueError("jwt_secret 未配置，请在 .env 文件或环境变量中设置")
+    if not settings.encryption_key:
+        raise ValueError("encryption_key 未配置，请运行以下命令生成:\n"
+                         "  python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\"")
+    return settings

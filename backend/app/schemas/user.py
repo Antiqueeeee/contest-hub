@@ -1,5 +1,6 @@
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+from app.utils.crypto import mask_phone
 
 
 class LoginRequest(BaseModel):
@@ -36,7 +37,8 @@ class UserOut(BaseModel):
 
     model_config = {"from_attributes": True}
 
-
-class UserListOut(BaseModel):
-    items: list[UserOut]
-    total: int
+    @field_validator("phone", mode="before")
+    @classmethod
+    def mask_phone_field(cls, v: str) -> str:
+        """Auto-mask phone numbers in all API responses."""
+        return mask_phone(v) if v else v

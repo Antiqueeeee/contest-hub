@@ -2,6 +2,16 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
+class ResultFilter(BaseModel):
+    """Query filters for listing results — consolidates the 7 query parameters."""
+    contest_id: int | None = None
+    group_id: int | None = None
+    is_published: bool | None = None
+    keyword: str = ""
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=20, ge=1, le=100)
+
+
 class ResultCreate(BaseModel):
     contest_id: int
     registration_id: int
