@@ -16,13 +16,15 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # 幂等：表存在 + 列不存在 才加列。全新空库表不存在时跳过，交给 init_db 的 create_all
     op.execute("""
         DO $$
         BEGIN
-            IF NOT EXISTS (
-                SELECT 1 FROM information_schema.columns
-                WHERE table_name = 'contests' AND column_name = 'timezone'
-            ) THEN
+            IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'contests')
+               AND NOT EXISTS (
+                   SELECT 1 FROM information_schema.columns
+                   WHERE table_name = 'contests' AND column_name = 'timezone'
+               ) THEN
                 ALTER TABLE contests ADD COLUMN timezone VARCHAR(50) NOT NULL DEFAULT 'Asia/Shanghai';
             END IF;
         END $$;
