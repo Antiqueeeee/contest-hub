@@ -1,7 +1,7 @@
 """add_timezone_to_contests
 
 Revision ID: 0d61e0dc949f
-Revises:
+Revises: aaeffcbcc3b5
 Create Date: 2026-06-13
 
 """

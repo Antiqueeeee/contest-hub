@@ -221,7 +221,6 @@ async def update_contest(db: AsyncSession, contest_id: int, data: ContestUpdate)
             contest.status = derived
 
     if groups_data is not None:
-        await db.execute(select(ContestGroup).where(ContestGroup.contest_id == contest_id))
         existing = (await db.execute(select(ContestGroup).where(ContestGroup.contest_id == contest_id))).scalars().all()
         for eg in existing:
             await db.delete(eg)

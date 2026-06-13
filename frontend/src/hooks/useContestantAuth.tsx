@@ -10,14 +10,28 @@ function setCToken(token: string) { sessionStorage.setItem(TOKEN_KEY, token) }
 function clearCToken() { sessionStorage.removeItem(TOKEN_KEY) }
 function getCToken() { return sessionStorage.getItem(TOKEN_KEY) }
 
-export function contestantApi() {
+async function caRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getCToken()
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string> || {}),
+  }
   if (token) headers['Authorization'] = `Bearer ${token}`
+
+  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(err.detail || `HTTP ${res.status}`)
+  }
+  if (res.status === 204) return undefined as T
+  return res.json()
+}
+
+export function contestantApi() {
   return {
-    get: <T,>(path: string): Promise<T> => fetch(`${BASE_URL}${path}`, { headers }).then(r => r.ok ? r.json() : Promise.reject(r)),
-    post: <T,>(path: string, body?: unknown): Promise<T> => fetch(`${BASE_URL}${path}`, { method: 'POST', headers, body: body ? JSON.stringify(body) : undefined }).then(r => r.ok ? r.json() : Promise.reject(r)),
-    put: <T,>(path: string, body?: unknown): Promise<T> => fetch(`${BASE_URL}${path}`, { method: 'PUT', headers, body: body ? JSON.stringify(body) : undefined }).then(r => r.ok ? r.json() : Promise.reject(r)),
+    get: <T,>(path: string): Promise<T> => caRequest<T>(path),
+    post: <T,>(path: string, body?: unknown): Promise<T> => caRequest<T>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined }),
+    put: <T,>(path: string, body?: unknown): Promise<T> => caRequest<T>(path, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }),
   }
 }
 
