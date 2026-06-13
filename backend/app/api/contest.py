@@ -56,6 +56,12 @@ async def delete_contest(contest_id: int, db: AsyncSession = Depends(get_db), cu
 
 # --- Public ---
 
+@public_router.get("/timezones")
+async def timezone_options():
+    from app.utils.timezone import TZ_OPTIONS
+    return TZ_OPTIONS
+
+
 @public_router.get("")
 async def public_contests_list(db: AsyncSession = Depends(get_db)):
     items, _ = await contest_service.list_contests(db, page=1, page_size=50)

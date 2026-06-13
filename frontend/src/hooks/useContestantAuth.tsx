@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
-import { api } from '@/api/client'
+import { api, BASE_URL } from '@/api/client'
 
 interface Contestant { id: number; name: string; email: string; id_number: string; organization: string | null }
 
@@ -14,11 +14,10 @@ export function contestantApi() {
   const token = getCToken()
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (token) headers['Authorization'] = `Bearer ${token}`
-  const BASE = 'http://localhost:8000/api'
   return {
-    get: <T,>(path: string): Promise<T> => fetch(`${BASE}${path}`, { headers }).then(r => r.ok ? r.json() : Promise.reject(r)),
-    post: <T,>(path: string, body?: unknown): Promise<T> => fetch(`${BASE}${path}`, { method: 'POST', headers, body: body ? JSON.stringify(body) : undefined }).then(r => r.ok ? r.json() : Promise.reject(r)),
-    put: <T,>(path: string, body?: unknown): Promise<T> => fetch(`${BASE}${path}`, { method: 'PUT', headers, body: body ? JSON.stringify(body) : undefined }).then(r => r.ok ? r.json() : Promise.reject(r)),
+    get: <T,>(path: string): Promise<T> => fetch(`${BASE_URL}${path}`, { headers }).then(r => r.ok ? r.json() : Promise.reject(r)),
+    post: <T,>(path: string, body?: unknown): Promise<T> => fetch(`${BASE_URL}${path}`, { method: 'POST', headers, body: body ? JSON.stringify(body) : undefined }).then(r => r.ok ? r.json() : Promise.reject(r)),
+    put: <T,>(path: string, body?: unknown): Promise<T> => fetch(`${BASE_URL}${path}`, { method: 'PUT', headers, body: body ? JSON.stringify(body) : undefined }).then(r => r.ok ? r.json() : Promise.reject(r)),
   }
 }
 

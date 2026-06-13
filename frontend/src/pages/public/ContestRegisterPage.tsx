@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { api } from '@/api/client'
-import { useContestantAuth, getCToken, contestantApi } from '@/hooks/useContestantAuth'
+import { useContestantAuth, contestantApi } from '@/hooks/useContestantAuth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -62,13 +62,9 @@ export default function ContestRegisterPage() {
     try {
       const cf: Record<string, string> = {}
       contest.fields?.forEach(f => { if (customValues[f.id]) cf[f.field_name] = customValues[f.id] })
-      const token = getCToken()
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (token) headers['Authorization'] = `Bearer ${token}`
-      const res = await fetch(`http://localhost:8000/api/public/contests/${contest.id}/register`, {
-        method: 'POST', headers,
-        body: JSON.stringify({ contest_id: contest.id, group_id: groupId ? Number(groupId) : null, name, email, id_number: idNumber, organization: organization || null, custom_fields: cf, privacy_agreed: privacyAgreed }),
-      }).then(r => r.ok ? r.json() : r.json().then(e => { throw new Error(e.detail || '报名失败') }))
+      const res = await contestantApi().post<{ registration_number: string }>(`/public/contests/${contest.id}/register`, {
+        contest_id: contest.id, group_id: groupId ? Number(groupId) : null, name, email, id_number: idNumber, organization: organization || null, custom_fields: cf, privacy_agreed: privacyAgreed,
+      })
       navigate(`/contests/${contest.id}/register/success`, { state: { registrationNumber: res.registration_number, contestTitle: contest.title, name } })
     } catch (e) { alert(e instanceof Error ? e.message : '报名失败') }
     finally { setSubmitting(false) }

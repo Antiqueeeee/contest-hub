@@ -15,19 +15,7 @@ interface Field { field_name: string; field_type: string; is_required: boolean; 
 interface Award { name: string; description: string; sort_order: number }
 interface Template { id: number; name: string; items: { id: number; name: string; description: string; max_participants: number }[] }
 
-const TZ_OPTIONS = [
-  { value: 'Asia/Shanghai', label: '北京时间 (UTC+8)' },
-  { value: 'Asia/Tokyo', label: '东京时间 (UTC+9)' },
-  { value: 'Asia/Seoul', label: '首尔时间 (UTC+9)' },
-  { value: 'Asia/Bangkok', label: '曼谷时间 (UTC+7)' },
-  { value: 'Asia/Kolkata', label: '印度时间 (UTC+5:30)' },
-  { value: 'Europe/London', label: '伦敦时间 (UTC+0)' },
-  { value: 'Europe/Berlin', label: '柏林时间 (UTC+1)' },
-  { value: 'America/New_York', label: '美东时间 (UTC-5)' },
-  { value: 'America/Los_Angeles', label: '美西时间 (UTC-8)' },
-  { value: 'Australia/Sydney', label: '悉尼时间 (UTC+10)' },
-  { value: 'UTC', label: '协调世界时 (UTC+0)' },
-]
+interface TzOption { value: string; label: string }
 
 const FIELD_TYPES = [
   { value: 'text', label: '文本' },
@@ -53,6 +41,7 @@ export default function ContestEditPage() {
   const [regEnd, setRegEnd] = useState('')
   const [maxParticipants, setMaxParticipants] = useState('0')
   const [timezone, setTimezone] = useState('Asia/Shanghai')
+  const [tzOptions, setTzOptions] = useState<TzOption[]>([])
 
   // Groups - selected item IDs from templates
   const [templates, setTemplates] = useState<Template[]>([])
@@ -69,8 +58,9 @@ export default function ContestEditPage() {
 
   // Load existing contest
   useEffect(() => {
-    // Load templates
+    // Load templates & timezone options
     api.get<{ items: Template[] }>('/admin/groups/templates').then(r => setTemplates(r.items)).catch(() => {})
+    api.get<TzOption[]>('/public/contests/timezones').then(r => setTzOptions(r as any)).catch(() => {})
 
     if (!isNew) {
       api.get<{
@@ -166,19 +156,19 @@ export default function ContestEditPage() {
             <div className="space-y-1">
               <Label>报名开始 <span className="text-destructive">*</span></Label>
               <Input type="datetime-local" value={regStart} onChange={e => setRegStart(e.target.value)} />
-              <p className="text-xs text-muted-foreground">{TZ_OPTIONS.find(t => t.value === timezone)?.label || timezone}</p>
+              <p className="text-xs text-muted-foreground">{tzOptions.find(t => t.value === timezone)?.label || timezone}</p>
             </div>
             <div className="space-y-1">
               <Label>报名截止 <span className="text-destructive">*</span></Label>
               <Input type="datetime-local" value={regEnd} onChange={e => setRegEnd(e.target.value)} />
-              <p className="text-xs text-muted-foreground">{TZ_OPTIONS.find(t => t.value === timezone)?.label || timezone}</p>
+              <p className="text-xs text-muted-foreground">{tzOptions.find(t => t.value === timezone)?.label || timezone}</p>
             </div>
           </div>
           <div className="space-y-1 pt-2">
             <Label className="text-muted-foreground">时区</Label>
             <select value={timezone} onChange={e => setTimezone(e.target.value)}
               className="w-full max-w-xs h-9 rounded-md border border-input bg-background px-3 text-sm text-muted-foreground">
-              {TZ_OPTIONS.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
+              {tzOptions.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
             </select>
           </div>
         </CardContent>
