@@ -12,6 +12,14 @@ export function clearToken() {
   sessionStorage.removeItem('contest_hub_token')
 }
 
+/** Handle 401 — clear expired token and redirect to login. */
+function handleAuthExpired() {
+  clearToken()
+  if (!window.location.pathname.includes('/login')) {
+    window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken()
   const headers: Record<string, string> = {
@@ -23,6 +31,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   const res = await fetch(`${BASE_URL}${path}`, { ...options, headers })
+  if (res.status === 401) { handleAuthExpired(); throw new Error('登录已过期，请重新登录') }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
     throw new Error(err.detail || `HTTP ${res.status}`)
@@ -44,6 +53,7 @@ export const api = {
     const headers: Record<string, string> = {}
     if (token) headers['Authorization'] = `Bearer ${token}`
     const res = await fetch(`${BASE_URL}${path}`, { headers })
+    if (res.status === 401) { handleAuthExpired(); throw new Error('登录已过期，请重新登录') }
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: res.statusText }))
       throw new Error(err.detail || `HTTP ${res.status}`)
@@ -59,6 +69,7 @@ export const api = {
     const headers: Record<string, string> = {}
     if (token) headers['Authorization'] = `Bearer ${token}`
     const res = await fetch(`${BASE_URL}${path}`, { method: 'POST', headers, body: formData })
+    if (res.status === 401) { handleAuthExpired(); throw new Error('登录已过期，请重新登录') }
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: res.statusText }))
       throw new Error(err.detail || `HTTP ${res.status}`)
