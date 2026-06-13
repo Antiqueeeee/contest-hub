@@ -6,7 +6,7 @@ services:
     restart: always
     environment:
       POSTGRES_USER: contest
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-contest123}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
       POSTGRES_DB: contest_hub
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -26,9 +26,10 @@ services:
       DB_HOST: db
       DB_PORT: 5432
       DB_USER: contest
-      DB_PASSWORD: ${DB_PASSWORD:-contest123}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
       DB_NAME: contest_hub
-      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-random-string}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set}
       JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-120}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost}
       EXPORT_DIR: /app/exports
