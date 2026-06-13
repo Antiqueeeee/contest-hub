@@ -66,8 +66,8 @@ export default function ExportPage() {
         await new Promise(r => setTimeout(r, 1000))
         const task = await api.get<{ status: string; task_id: string }>(`/admin/export/tasks/${res.task_id}`)
         if (task.status === 'completed') {
-          const token = sessionStorage.getItem('contest_hub_token')
-          const blob = await fetch(`http://localhost:8000/api/admin/export/download/${res.task_id}`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.blob())
+          // Download via the API proxy (not hardcoded localhost) so it works across deployments
+          const blob = await api.getBlob(`/admin/export/download/${res.task_id}`)
           const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `export_${res.task_id}.xlsx`; a.click()
           return
         }
