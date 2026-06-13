@@ -87,12 +87,28 @@ const GUIDES: Record<string, { purpose: string; prompt: string }> = {
   },
 }
 
-/** Inline copy button that shows a checkmark for 1.5s after click. */
+/** Inline copy button with fallback for non-HTTPS environments. */
 function CopyBtn({ text }: { text: string }) {
   const [done, setDone] = useState(false)
+
+  const handleCopy = () => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => {
+        setDone(true); setTimeout(() => setDone(false), 1500)
+      }).catch(() => {})
+    } else {
+      // Fallback for HTTP (clipboard API requires secure context)
+      const ta = document.createElement('textarea')
+      ta.value = text; ta.style.position = 'fixed'; ta.style.left = '-9999px'
+      document.body.appendChild(ta); ta.select()
+      document.execCommand('copy'); document.body.removeChild(ta)
+      setDone(true); setTimeout(() => setDone(false), 1500)
+    }
+  }
+
   return (
     <button
-      onClick={() => { navigator.clipboard.writeText(text); setDone(true); setTimeout(() => setDone(false), 1500) }}
+      onClick={handleCopy}
       className="absolute top-1.5 right-1.5 p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
       title="复制"
     >
