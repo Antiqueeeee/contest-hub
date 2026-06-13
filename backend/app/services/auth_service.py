@@ -96,13 +96,3 @@ async def toggle_user_status(db: AsyncSession, user_id: int, current_user_id: in
     await db.refresh(user)
     return user
 
-
-async def reset_password(db: AsyncSession, user_id: int) -> str:
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
-    new_password = "reset123456"
-    user.password_hash = hash_password(new_password)
-    await db.commit()
-    return new_password

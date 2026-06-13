@@ -40,8 +40,3 @@ async def toggle_status(user_id: int, db: AsyncSession = Depends(get_db), curren
     user = await auth_service.toggle_user_status(db, user_id, current_user["user_id"])
     return {"message": "状态已更新", "status": user.status.value}
 
-
-@admin_router.post("/{user_id}/reset-password")
-async def reset_password(user_id: int, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    new_pw = await auth_service.reset_password(db, user_id)
-    return {"message": f"密码已重置为: {new_pw}"}

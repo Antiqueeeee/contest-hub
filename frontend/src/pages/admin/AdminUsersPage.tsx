@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { UserPlus, Pencil, Ban, KeyRound } from 'lucide-react'
+import { UserPlus, Pencil, Ban } from 'lucide-react'
 
 interface User { id: number; username: string; name: string; phone: string; status: string; last_login_at: string | null; created_at: string }
 
@@ -40,11 +40,6 @@ export default function AdminUsersPage() {
     fetchUsers()
   }
 
-  const handleResetPassword = async (u: User) => {
-    const res = await api.post<{ message: string }>(`/admin/users/${u.id}/reset-password`)
-    alert(res.message)
-  }
-
   if (loading) return <div className="text-center py-12 text-muted-foreground">加载中...</div>
 
   return (
@@ -61,7 +56,6 @@ export default function AdminUsersPage() {
               <TableCell className="text-right space-x-1">
                 <Button variant="ghost" size="sm" onClick={() => handleEdit(u)}><Pencil className="h-3 w-3" /></Button>
                 {u.id !== currentUser?.id && <Button variant="ghost" size="sm" onClick={() => handleToggleStatus(u)}><Ban className="h-3 w-3" /></Button>}
-                <Button variant="ghost" size="sm" onClick={() => handleResetPassword(u)}><KeyRound className="h-3 w-3" /></Button>
               </TableCell>
             </TableRow>
           ))}
