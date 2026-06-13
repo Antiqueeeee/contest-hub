@@ -19,6 +19,14 @@ async function caRequest<T>(path: string, options: RequestInit = {}): Promise<T>
   if (token) headers['Authorization'] = `Bearer ${token}`
 
   const res = await fetch(`${BASE_URL}${path}`, { ...options, headers })
+  if (res.status === 401) {
+    clearCToken()
+    sessionStorage.removeItem(USER_KEY)
+    if (!window.location.pathname.includes('/login')) {
+      window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`
+    }
+    throw new Error('登录已过期，请重新登录')
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
     throw new Error(err.detail || `HTTP ${res.status}`)
