@@ -3,7 +3,7 @@ import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Lightbulb } from 'lucide-react'
+import { Lightbulb, Copy, Check } from 'lucide-react'
 
 const pages = [
   { key: 'about', label: '平台介绍' },
@@ -87,6 +87,20 @@ const GUIDES: Record<string, { purpose: string; prompt: string }> = {
   },
 }
 
+/** Inline copy button that shows a checkmark for 1.5s after click. */
+function CopyBtn({ text }: { text: string }) {
+  const [done, setDone] = useState(false)
+  return (
+    <button
+      onClick={() => { navigator.clipboard.writeText(text); setDone(true); setTimeout(() => setDone(false), 1500) }}
+      className="absolute top-1.5 right-1.5 p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+      title="复制"
+    >
+      {done ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
+    </button>
+  )
+}
+
 export default function SiteContentPage() {
   const [pageKey, setPageKey] = useState('about')
   const [content, setContent] = useState('')
@@ -121,11 +135,9 @@ export default function SiteContentPage() {
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">编辑页面内容</CardTitle>
-            <div className="flex items-center gap-2">
-              <select value={pageKey} onChange={e => setPageKey(e.target.value)} className="h-8 rounded-md border border-input bg-background px-2 text-xs">
-                {pages.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
-              </select>
-            </div>
+            <select value={pageKey} onChange={e => setPageKey(e.target.value)} className="h-8 rounded-md border border-input bg-background px-2 text-xs">
+              {pages.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
+            </select>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -141,37 +153,38 @@ export default function SiteContentPage() {
               />
               <div className="flex items-center justify-between">
                 <Button onClick={handleSave} disabled={saving}>{saving ? '保存中...' : '保存并发布'}</Button>
-                <button
+                <Button
+                  variant={showGuide ? 'secondary' : 'outline'}
+                  size="sm"
                   onClick={() => setShowGuide(!showGuide)}
-                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  <Lightbulb className="h-3 w-3" />
+                  <Lightbulb className="h-3.5 w-3.5 mr-1" />
                   AI 生成参考
-                </button>
+                </Button>
               </div>
             </>
           )}
         </CardContent>
       </Card>
 
-      {/* AI guide — subtle, below the fold */}
       {showGuide && (
-        <div className="rounded-lg border border-dashed bg-muted/30 p-4 space-y-3 text-sm">
+        <div className="rounded-lg border bg-card p-4 space-y-4 text-sm">
           <p className="text-xs text-muted-foreground">
             <strong className="text-foreground">{pages.find(p => p.key === pageKey)?.label}</strong> — {guide.purpose}
           </p>
           <div>
-            <p className="text-xs font-medium mb-1">AI 生成提示词（复制发给 ChatGPT / 通义千问 / 豆包）</p>
-            <pre className="bg-background border rounded-md p-2.5 text-xs overflow-auto whitespace-pre-wrap text-muted-foreground">{guide.prompt}</pre>
+            <p className="text-xs font-medium mb-1.5">提示词（发给 ChatGPT / 通义千问 / 豆包生成内容）</p>
+            <div className="relative">
+              <pre className="bg-muted/50 border rounded-md p-3 pr-10 text-xs overflow-auto whitespace-pre-wrap text-muted-foreground">{guide.prompt}</pre>
+              <CopyBtn text={guide.prompt} />
+            </div>
           </div>
           <div>
-            <p className="text-xs font-medium mb-1">默认模板</p>
-            <div className="flex gap-2 mb-1.5">
-              <Button variant="secondary" size="sm" onClick={() => { setContent(DEFAULTS[pageKey]); setShowGuide(false) }}>填入编辑框</Button>
-              <Button variant="ghost" size="sm" onClick={() => navigator.clipboard.writeText(DEFAULTS[pageKey])}>复制模板</Button>
-              <Button variant="ghost" size="sm" onClick={() => navigator.clipboard.writeText(guide.prompt)}>复制提示词</Button>
+            <p className="text-xs font-medium mb-1.5">默认模板（可填入编辑框或复制给 AI 修改）</p>
+            <div className="relative">
+              <pre className="bg-muted/50 border rounded-md p-3 pr-10 text-xs overflow-auto whitespace-pre-wrap max-h-40 text-muted-foreground">{DEFAULTS[pageKey]}</pre>
+              <CopyBtn text={DEFAULTS[pageKey]} />
             </div>
-            <pre className="bg-background border rounded-md p-2.5 text-xs overflow-auto whitespace-pre-wrap max-h-40 text-muted-foreground">{DEFAULTS[pageKey]}</pre>
           </div>
         </div>
       )}
