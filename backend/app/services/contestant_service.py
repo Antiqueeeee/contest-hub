@@ -11,7 +11,7 @@ from app.models.result import Result
 from app.schemas.contestant import ContestantRegister, ContestantProfileUpdate
 from app.services.auth_service import hash_password, verify_password
 from app.services.result_service import lookup_award_name
-from app.utils.crypto import mask_id_number, mask_email
+from app.utils.crypto import mask_id_number, mask_email  # mask_id_number used in _enrich_registration_item
 
 
 # ── Token ────────────────────────────────────────────────────────
@@ -26,7 +26,11 @@ def create_contestant_token(contestant_id: int) -> str:
 
 
 def _build_auth_response(contestant: Contestant) -> dict:
-    """Build the standard login/register response dict with masked PII."""
+    """Build the standard login/register response dict.
+
+    id_number is returned in full — the user just provided it during
+    registration/login and the frontend may need it to pre-fill forms.
+    """
     token = create_contestant_token(contestant.id)
     return {
         "access_token": token,
@@ -34,7 +38,7 @@ def _build_auth_response(contestant: Contestant) -> dict:
             "id": contestant.id,
             "name": contestant.name,
             "email": contestant.email,
-            "id_number": mask_id_number(contestant.id_number),
+            "id_number": contestant.id_number,
             "organization": contestant.organization,
         },
     }
