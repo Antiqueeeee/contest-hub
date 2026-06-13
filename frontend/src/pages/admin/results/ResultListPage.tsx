@@ -124,7 +124,7 @@ export default function ResultListPage() {
     const input = document.createElement('input'); input.type = 'file'; input.accept = '.xlsx'
     input.onchange = async () => {
       const file = input.files?.[0]; if (!file) return
-      const data = await api.upload(`/admin/results/import?contest_id=${contestId}`, file)
+      const data = await api.upload<{ success_count: number; error_count: number }>(`/admin/results/import?contest_id=${contestId}`, file)
       alert(`导入完成：成功 ${data.success_count} 条，失败 ${data.error_count} 条`)
       // Refresh
       const r = await api.get<{ items: ResultItem[] }>(`/admin/results?contest_id=${contestId}&page_size=100`)
