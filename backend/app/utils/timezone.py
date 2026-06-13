@@ -23,11 +23,13 @@ TZ_OPTIONS: list[dict] = [
 DEFAULT_TZ = "Asia/Shanghai"
 
 
-def to_aware(dt: datetime, tz_name: str = DEFAULT_TZ) -> datetime:
+def to_aware(dt: datetime, tz_name: str) -> datetime:
     """Convert a naive datetime to timezone-aware using the given IANA timezone name.
 
     If the datetime already has tzinfo, return it unchanged.
     If naive, interpret it as being in the given timezone.
+
+    tz_name is required — callers must explicitly decide which timezone to use.
     """
     if dt.tzinfo is not None:
         return dt

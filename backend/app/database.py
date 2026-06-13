@@ -21,5 +21,7 @@ async def get_db() -> AsyncSession:
 
 
 async def init_db():
+    # TODO: 生成完整 initial 迁移后删除 create_all，统一走 Alembic
+    # 当前两套并存：create_all 处理新库建表，Alembic 处理老库增量
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
