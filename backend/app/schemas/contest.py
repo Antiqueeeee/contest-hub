@@ -4,6 +4,7 @@ from app.utils.timezone import to_aware
 
 
 class ContestGroupIn(BaseModel):
+    id: int | None = None   # set for existing groups → update; None → create new
     name: str = Field(min_length=1, max_length=100)
     description: str = ""
     max_participants: int = 0
@@ -23,6 +24,7 @@ class ContestGroupOut(BaseModel):
 
 
 class AwardIn(BaseModel):
+    id: int | None = None   # set for existing awards → update; None → create new
     name: str = Field(min_length=1, max_length=100)
     description: str = ""
     sort_order: int = 0

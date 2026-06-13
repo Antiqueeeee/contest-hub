@@ -222,19 +222,41 @@ async def update_contest(db: AsyncSession, contest_id: int, data: ContestUpdate)
 
     if groups_data is not None:
         existing = (await db.execute(select(ContestGroup).where(ContestGroup.contest_id == contest_id))).scalars().all()
-        for eg in existing:
-            await db.delete(eg)
+        existing_by_id = {g.id: g for g in existing}
+        submitted_ids = {g.get("id") for g in groups_data if g.get("id") is not None}
+
+        # Delete groups that were removed (not in the submitted list)
+        for g in existing:
+            if g.id not in submitted_ids:
+                await db.delete(g)
+
+        # Update existing / create new
         for g in groups_data:
             gd = g.model_dump() if hasattr(g, 'model_dump') else g
-            db.add(ContestGroup(contest_id=contest_id, **gd))
+            gid = gd.pop("id", None)
+            if gid and gid in existing_by_id:
+                for k, v in gd.items():
+                    setattr(existing_by_id[gid], k, v)
+            else:
+                db.add(ContestGroup(contest_id=contest_id, **gd))
 
     if awards_data is not None:
         existing = (await db.execute(select(Award).where(Award.contest_id == contest_id))).scalars().all()
-        for ea in existing:
-            await db.delete(ea)
+        existing_by_id = {a.id: a for a in existing}
+        submitted_ids = {a.get("id") for a in awards_data if a.get("id") is not None}
+
+        for a in existing:
+            if a.id not in submitted_ids:
+                await db.delete(a)
+
         for a in awards_data:
             ad = a.model_dump() if hasattr(a, 'model_dump') else a
-            db.add(Award(contest_id=contest_id, **ad))
+            aid = ad.pop("id", None)
+            if aid and aid in existing_by_id:
+                for k, v in ad.items():
+                    setattr(existing_by_id[aid], k, v)
+            else:
+                db.add(Award(contest_id=contest_id, **ad))
 
     if fields_data is not None:
         existing = (await db.execute(select(ContestField).where(ContestField.contest_id == contest_id))).scalars().all()

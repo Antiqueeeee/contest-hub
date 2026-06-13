@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { Plus, Trash2 } from 'lucide-react'
 
 interface Field { field_name: string; field_type: string; is_required: boolean; options: string[] | null; sort_order: number }
-interface Award { name: string; description: string; sort_order: number }
+interface Award { id?: number; name: string; description: string; sort_order: number }
 interface Template { id: number; name: string; items: { id: number; name: string; description: string; max_participants: number }[] }
 
 interface TzOption { value: string; label: string }
@@ -46,6 +46,8 @@ export default function ContestEditPage() {
   // Groups - selected item IDs from templates
   const [templates, setTemplates] = useState<Template[]>([])
   const [selectedGroupIds, setSelectedGroupIds] = useState<number[]>([])
+  // Existing contest groups (for preserving IDs on edit)
+  const [existingGroups, setExistingGroups] = useState<{ id: number; template_item_id: number | null }[]>([])
 
   // Awards
   const [awardsList, setAwardsList] = useState<Award[]>([])
@@ -84,6 +86,7 @@ export default function ContestEditPage() {
         // Map contest groups to template item IDs for checkbox selection
         if (c.groups?.length > 0) {
           setSelectedGroupIds(c.groups.map(g => g.template_item_id || g.id))
+          setExistingGroups(c.groups.map(g => ({ id: g.id, template_item_id: g.template_item_id })))
         }
       }).catch(() => {})
     }
@@ -110,11 +113,13 @@ export default function ContestEditPage() {
         registration_start: regStart, registration_end: regEnd,
         max_participants: Number(maxParticipants),
         groups: selectedGroupIds.map((gid, i) => {
+          // Preserve existing group ID (matched by template_item_id) so FK references survive edits
+          const prev = existingGroups.find(g => g.template_item_id === gid)
           for (const t of templates) {
             const item = t.items.find(it => it.id === gid)
-            if (item) return { name: item.name, description: item.description, max_participants: item.max_participants, sort_order: i + 1, template_item_id: item.id }
+            if (item) return { id: prev?.id, name: item.name, description: item.description, max_participants: item.max_participants, sort_order: i + 1, template_item_id: item.id }
           }
-          return { name: `组别${gid}`, description: '', max_participants: 0, sort_order: i + 1, template_item_id: gid }
+          return { id: prev?.id, name: `组别${gid}`, description: '', max_participants: 0, sort_order: i + 1, template_item_id: gid }
         }),
         awards: awardsList.filter(a => a.name),
         score_categories: scoreCategories.filter(s => s.trim()),
