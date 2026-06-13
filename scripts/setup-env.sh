@@ -46,7 +46,7 @@ set_env() {
 is_set() {
     local val
     val=$(get_env "$1")
-    [ -n "$val" ] && [ "$val" != "change-me"* ] && [ "$val" != "your-"* ]
+    [ -n "$val" ] && [[ "$val" != change-me* ]] && [[ "$val" != your-* ]]
 }
 
 # Generate a random secret
