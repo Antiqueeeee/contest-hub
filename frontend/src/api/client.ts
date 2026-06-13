@@ -50,4 +50,19 @@ export const api = {
     }
     return res.blob()
   },
+
+  /** Upload a file via multipart/form-data.  Returns parsed JSON response. */
+  upload: async <T>(path: string, file: File): Promise<T> => {
+    const token = getToken()
+    const formData = new FormData()
+    formData.append('file', file)
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    const res = await fetch(`${BASE_URL}${path}`, { method: 'POST', headers, body: formData })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }))
+      throw new Error(err.detail || `HTTP ${res.status}`)
+    }
+    return res.json()
+  },
 }

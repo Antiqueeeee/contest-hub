@@ -115,9 +115,7 @@ export default function ResultListPage() {
 
   const handleDownloadTemplate = async () => {
     if (!contestId) return alert('请先选择赛事')
-    const token = sessionStorage.getItem('contest_hub_token')
-    const res = await fetch(`http://localhost:8000/api/admin/results/template?contest_id=${contestId}`, { headers: { Authorization: `Bearer ${token}` } })
-    const blob = await res.blob()
+    const blob = await api.getBlob(`/admin/results/template?contest_id=${contestId}`)
     const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'template.xlsx'; a.click()
   }
 
@@ -126,10 +124,7 @@ export default function ResultListPage() {
     const input = document.createElement('input'); input.type = 'file'; input.accept = '.xlsx'
     input.onchange = async () => {
       const file = input.files?.[0]; if (!file) return
-      const formData = new FormData(); formData.append('file', file)
-      const token = sessionStorage.getItem('contest_hub_token')
-      const res = await fetch(`http://localhost:8000/api/admin/results/import?contest_id=${contestId}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData })
-      const data = await res.json()
+      const data = await api.upload(`/admin/results/import?contest_id=${contestId}`, file)
       alert(`导入完成：成功 ${data.success_count} 条，失败 ${data.error_count} 条`)
       // Refresh
       const r = await api.get<{ items: ResultItem[] }>(`/admin/results?contest_id=${contestId}&page_size=100`)
