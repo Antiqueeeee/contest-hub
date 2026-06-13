@@ -12,6 +12,7 @@ from app.utils.timezone import to_aware
 def _build_contest_select():
     return (
         select(Contest)
+        .where(Contest.deleted_at.is_(None))
         .options(
             selectinload(Contest.groups),
             selectinload(Contest.awards),
@@ -92,7 +93,7 @@ async def list_contests(
     db: AsyncSession, keyword: str = "", status: str | None = None, page: int = 1, page_size: int = 20
 ) -> tuple[list[Contest], int]:
     query = _build_contest_select()
-    count_query = select(func.count(Contest.id))
+    count_query = select(func.count(Contest.id)).where(Contest.deleted_at.is_(None))
 
     if keyword:
         query = query.where(Contest.title.ilike(f"%{keyword}%"))
@@ -221,14 +222,14 @@ async def update_contest(db: AsyncSession, contest_id: int, data: ContestUpdate)
             contest.status = derived
 
     if groups_data is not None:
-        existing = (await db.execute(select(ContestGroup).where(ContestGroup.contest_id == contest_id))).scalars().all()
+        existing = (await db.execute(select(ContestGroup).where(ContestGroup.contest_id == contest_id, ContestGroup.deleted_at.is_(None)))).scalars().all()
         existing_by_id = {g.id: g for g in existing}
         submitted_ids = {g.get("id") for g in groups_data if g.get("id") is not None}
 
-        # Delete groups that were removed (not in the submitted list)
+        # Soft-delete groups that were removed (not in the submitted list)
         for g in existing:
             if g.id not in submitted_ids:
-                await db.delete(g)
+                g.deleted_at = datetime.now(timezone.utc)
 
         # Update existing / create new
         for g in groups_data:
@@ -241,13 +242,13 @@ async def update_contest(db: AsyncSession, contest_id: int, data: ContestUpdate)
                 db.add(ContestGroup(contest_id=contest_id, **gd))
 
     if awards_data is not None:
-        existing = (await db.execute(select(Award).where(Award.contest_id == contest_id))).scalars().all()
+        existing = (await db.execute(select(Award).where(Award.contest_id == contest_id, Award.deleted_at.is_(None)))).scalars().all()
         existing_by_id = {a.id: a for a in existing}
         submitted_ids = {a.get("id") for a in awards_data if a.get("id") is not None}
 
         for a in existing:
             if a.id not in submitted_ids:
-                await db.delete(a)
+                a.deleted_at = datetime.now(timezone.utc)
 
         for a in awards_data:
             ad = a.model_dump() if hasattr(a, 'model_dump') else a
@@ -259,9 +260,9 @@ async def update_contest(db: AsyncSession, contest_id: int, data: ContestUpdate)
                 db.add(Award(contest_id=contest_id, **ad))
 
     if fields_data is not None:
-        existing = (await db.execute(select(ContestField).where(ContestField.contest_id == contest_id))).scalars().all()
+        existing = (await db.execute(select(ContestField).where(ContestField.contest_id == contest_id, ContestField.deleted_at.is_(None)))).scalars().all()
         for ef in existing:
-            await db.delete(ef)
+            ef.deleted_at = datetime.now(timezone.utc)
         for f in fields_data:
             fd = f.model_dump() if hasattr(f, 'model_dump') else f
             db.add(ContestField(contest_id=contest_id, **fd))
@@ -324,7 +325,14 @@ async def copy_contest(db: AsyncSession, contest_id: int, creator_id: int) -> Co
 
 async def delete_contest(db: AsyncSession, contest_id: int):
     contest = await get_contest(db, contest_id)
-    await db.delete(contest)
+    now = datetime.now(timezone.utc)
+    contest.deleted_at = now
+    for g in contest.groups:
+        g.deleted_at = now
+    for a in contest.awards:
+        a.deleted_at = now
+    for f in contest.fields:
+        f.deleted_at = now
     await db.commit()
 
 

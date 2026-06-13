@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +16,10 @@ router = APIRouter(prefix="/api/admin/groups", tags=["组别管理"])
 @router.get("/templates")
 async def list_templates(db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     result = await db.execute(
-        select(GroupTemplate).options(selectinload(GroupTemplate.items)).order_by(GroupTemplate.sort_order)
+        select(GroupTemplate)
+        .options(selectinload(GroupTemplate.items))
+        .where(GroupTemplate.deleted_at.is_(None))
+        .order_by(GroupTemplate.sort_order)
     )
     templates = result.unique().scalars().all()
     return {
@@ -54,7 +58,7 @@ async def create_template(data: TemplateCreate, db: AsyncSession = Depends(get_d
 
 @router.put("/templates/{template_id}")
 async def update_template(template_id: int, data: TemplateUpdate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    r = await db.execute(select(GroupTemplate).where(GroupTemplate.id == template_id))
+    r = await db.execute(select(GroupTemplate).where(GroupTemplate.id == template_id, GroupTemplate.deleted_at.is_(None)))
     t = r.scalar_one_or_none()
     if not t: raise HTTPException(status_code=404, detail="不存在")
     for k, v in data.model_dump(exclude_unset=True).items(): setattr(t, k, v)
@@ -64,10 +68,14 @@ async def update_template(template_id: int, data: TemplateUpdate, db: AsyncSessi
 
 @router.delete("/templates/{template_id}")
 async def delete_template(template_id: int, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    r = await db.execute(select(GroupTemplate).where(GroupTemplate.id == template_id))
+    r = await db.execute(select(GroupTemplate).where(GroupTemplate.id == template_id, GroupTemplate.deleted_at.is_(None)))
     t = r.scalar_one_or_none()
     if not t: raise HTTPException(status_code=404, detail="不存在")
-    await db.delete(t); await db.commit()
+    now = datetime.now(timezone.utc)
+    t.deleted_at = now
+    for i in t.items:
+        i.deleted_at = now
+    await db.commit()
     return {"message": "已删除"}
 
 
@@ -97,7 +105,7 @@ async def create_item(data: ItemCreate, db: AsyncSession = Depends(get_db), curr
 
 @router.put("/items/{item_id}")
 async def update_item(item_id: int, data: ItemUpdate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    r = await db.execute(select(GroupItem).where(GroupItem.id == item_id))
+    r = await db.execute(select(GroupItem).where(GroupItem.id == item_id, GroupItem.deleted_at.is_(None)))
     i = r.scalar_one_or_none()
     if not i: raise HTTPException(status_code=404, detail="不存在")
     for k, v in data.model_dump(exclude_unset=True).items(): setattr(i, k, v)
@@ -107,8 +115,9 @@ async def update_item(item_id: int, data: ItemUpdate, db: AsyncSession = Depends
 
 @router.delete("/items/{item_id}")
 async def delete_item(item_id: int, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    r = await db.execute(select(GroupItem).where(GroupItem.id == item_id))
+    r = await db.execute(select(GroupItem).where(GroupItem.id == item_id, GroupItem.deleted_at.is_(None)))
     i = r.scalar_one_or_none()
     if not i: raise HTTPException(status_code=404, detail="不存在")
-    await db.delete(i); await db.commit()
+    i.deleted_at = datetime.now(timezone.utc)
+    await db.commit()
     return {"message": "已删除"}

@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime
-from sqlalchemy import String, Text, Boolean, Enum, Integer, DateTime, ForeignKey, func
+from sqlalchemy import String, Text, Boolean, Enum, Integer, DateTime, ForeignKey, func, and_
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -18,8 +18,12 @@ class NewsCategory(Base):
     name: Mapped[str] = mapped_column(String(50), nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    news: Mapped[list["News"]] = relationship(back_populates="category")
+    news: Mapped[list["News"]] = relationship(
+        back_populates="category",
+        primaryjoin="and_(NewsCategory.id == News.category_id, News.deleted_at.is_(None))",
+    )
 
 
 class News(Base):
@@ -36,6 +40,7 @@ class News(Base):
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     category: Mapped[NewsCategory] = relationship(back_populates="news")
     author: Mapped["User"] = relationship()

@@ -11,7 +11,9 @@ from app.schemas.news import NewsCategoryCreate, NewsCategoryUpdate, NewsCreate,
 # --- Categories ---
 
 async def list_categories(db: AsyncSession) -> list[NewsCategory]:
-    result = await db.execute(select(NewsCategory).order_by(NewsCategory.sort_order))
+    result = await db.execute(
+        select(NewsCategory).where(NewsCategory.deleted_at.is_(None)).order_by(NewsCategory.sort_order)
+    )
     return list(result.scalars().all())
 
 
@@ -24,7 +26,9 @@ async def create_category(db: AsyncSession, data: NewsCategoryCreate) -> NewsCat
 
 
 async def update_category(db: AsyncSession, cat_id: int, data: NewsCategoryUpdate) -> NewsCategory:
-    result = await db.execute(select(NewsCategory).where(NewsCategory.id == cat_id))
+    result = await db.execute(
+        select(NewsCategory).where(NewsCategory.id == cat_id, NewsCategory.deleted_at.is_(None))
+    )
     cat = result.scalar_one_or_none()
     if not cat:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="分类不存在")
@@ -38,11 +42,19 @@ async def update_category(db: AsyncSession, cat_id: int, data: NewsCategoryUpdat
 
 
 async def delete_category(db: AsyncSession, cat_id: int):
-    result = await db.execute(select(NewsCategory).where(NewsCategory.id == cat_id))
+    result = await db.execute(
+        select(NewsCategory).where(NewsCategory.id == cat_id, NewsCategory.deleted_at.is_(None))
+    )
     cat = result.scalar_one_or_none()
     if not cat:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="分类不存在")
-    await db.delete(cat)
+    cat.deleted_at = datetime.now(timezone.utc)
+    # Soft-delete all news in this category
+    news_result = await db.execute(
+        select(News).where(News.category_id == cat_id, News.deleted_at.is_(None))
+    )
+    for n in news_result.scalars().all():
+        n.deleted_at = datetime.now(timezone.utc)
     await db.commit()
 
 
@@ -56,8 +68,8 @@ async def list_news(
     page: int = 1,
     page_size: int = 20,
 ) -> tuple[list[News], int]:
-    query = select(News).options(joinedload(News.category), joinedload(News.author))
-    count_query = select(func.count(News.id))
+    query = select(News).options(joinedload(News.category), joinedload(News.author)).where(News.deleted_at.is_(None))
+    count_query = select(func.count(News.id)).where(News.deleted_at.is_(None))
 
     if keyword:
         query = query.where(News.title.ilike(f"%{keyword}%"))
@@ -79,7 +91,9 @@ async def list_news(
 
 
 async def get_news(db: AsyncSession, news_id: int) -> News:
-    result = await db.execute(select(News).options(joinedload(News.category)).where(News.id == news_id))
+    result = await db.execute(
+        select(News).options(joinedload(News.category)).where(News.id == news_id, News.deleted_at.is_(None))
+    )
     news = result.unique().scalar_one_or_none()
     if not news:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="新闻不存在")
@@ -87,7 +101,6 @@ async def get_news(db: AsyncSession, news_id: int) -> News:
 
 
 async def create_news(db: AsyncSession, data: NewsCreate, author_id: int) -> News:
-    from datetime import datetime, timezone
     news = News(
         author_id=author_id,
         status=NewsStatus.published,
@@ -101,7 +114,9 @@ async def create_news(db: AsyncSession, data: NewsCreate, author_id: int) -> New
 
 
 async def update_news(db: AsyncSession, news_id: int, data: NewsUpdate) -> News:
-    result = await db.execute(select(News).where(News.id == news_id))
+    result = await db.execute(
+        select(News).where(News.id == news_id, News.deleted_at.is_(None))
+    )
     news = result.scalar_one_or_none()
     if not news:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="新闻不存在")
@@ -114,7 +129,9 @@ async def update_news(db: AsyncSession, news_id: int, data: NewsUpdate) -> News:
 
 
 async def update_news_status(db: AsyncSession, news_id: int, new_status: str) -> News:
-    result = await db.execute(select(News).where(News.id == news_id))
+    result = await db.execute(
+        select(News).where(News.id == news_id, News.deleted_at.is_(None))
+    )
     news = result.scalar_one_or_none()
     if not news:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="新闻不存在")
@@ -127,19 +144,25 @@ async def update_news_status(db: AsyncSession, news_id: int, new_status: str) ->
 
 
 async def delete_news(db: AsyncSession, news_id: int):
-    result = await db.execute(select(News).where(News.id == news_id))
+    result = await db.execute(
+        select(News).where(News.id == news_id, News.deleted_at.is_(None))
+    )
     news = result.scalar_one_or_none()
     if not news:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="新闻不存在")
-    await db.delete(news)
+    news.deleted_at = datetime.now(timezone.utc)
     await db.commit()
 
 
 # --- Public ---
 
 async def list_public_news(db: AsyncSession, page: int = 1, page_size: int = 10) -> tuple[list[News], int]:
-    query = select(News).options(joinedload(News.category)).where(News.status == NewsStatus.published)
-    count_query = select(func.count(News.id)).where(News.status == NewsStatus.published)
+    query = select(News).options(joinedload(News.category)).where(
+        News.status == NewsStatus.published, News.deleted_at.is_(None),
+    )
+    count_query = select(func.count(News.id)).where(
+        News.status == NewsStatus.published, News.deleted_at.is_(None),
+    )
 
     total_result = await db.execute(count_query)
     total = total_result.scalar() or 0
@@ -152,7 +175,9 @@ async def list_public_news(db: AsyncSession, page: int = 1, page_size: int = 10)
 
 async def get_public_news_detail(db: AsyncSession, news_id: int) -> News:
     result = await db.execute(
-        select(News).options(joinedload(News.category)).where(News.id == news_id, News.status == NewsStatus.published)
+        select(News).options(joinedload(News.category)).where(
+            News.id == news_id, News.status == NewsStatus.published, News.deleted_at.is_(None),
+        )
     )
     news = result.scalar_one_or_none()
     if not news:

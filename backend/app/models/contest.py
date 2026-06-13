@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime
-from sqlalchemy import String, Text, Boolean, Enum, Integer, DateTime, ForeignKey, JSON, func
+from sqlalchemy import String, Text, Boolean, Enum, Integer, DateTime, ForeignKey, JSON, func, and_
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -32,10 +32,20 @@ class Contest(Base):
     timezone: Mapped[str] = mapped_column(String(50), default="Asia/Shanghai", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    groups: Mapped[list["ContestGroup"]] = relationship(back_populates="contest", cascade="all, delete-orphan")
-    awards: Mapped[list["Award"]] = relationship(back_populates="contest", cascade="all, delete-orphan")
-    fields: Mapped[list["ContestField"]] = relationship(back_populates="contest", cascade="all, delete-orphan")
+    groups: Mapped[list["ContestGroup"]] = relationship(
+        back_populates="contest", cascade="save-update, merge, refresh-expire, expunge",
+        primaryjoin="and_(Contest.id == ContestGroup.contest_id, ContestGroup.deleted_at.is_(None))",
+    )
+    awards: Mapped[list["Award"]] = relationship(
+        back_populates="contest", cascade="save-update, merge, refresh-expire, expunge",
+        primaryjoin="and_(Contest.id == Award.contest_id, Award.deleted_at.is_(None))",
+    )
+    fields: Mapped[list["ContestField"]] = relationship(
+        back_populates="contest", cascade="save-update, merge, refresh-expire, expunge",
+        primaryjoin="and_(Contest.id == ContestField.contest_id, ContestField.deleted_at.is_(None))",
+    )
 
 
 class ContestGroup(Base):
@@ -48,6 +58,7 @@ class ContestGroup(Base):
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     max_participants: Mapped[int] = mapped_column(Integer, default=0)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     contest: Mapped[Contest] = relationship(back_populates="groups")
 
@@ -60,6 +71,7 @@ class Award(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     contest: Mapped[Contest] = relationship(back_populates="awards")
 
@@ -74,5 +86,6 @@ class ContestField(Base):
     is_required: Mapped[bool] = mapped_column(Boolean, default=False)
     options: Mapped[list | None] = mapped_column(JSON, nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     contest: Mapped[Contest] = relationship(back_populates="fields")

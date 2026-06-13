@@ -1,4 +1,5 @@
-from sqlalchemy import String, Text, Integer, ForeignKey
+from datetime import datetime
+from sqlalchemy import String, Text, Integer, ForeignKey, DateTime, and_
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -10,8 +11,13 @@ class GroupTemplate(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str] = mapped_column(Text, default="")
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    items: Mapped[list["GroupItem"]] = relationship(back_populates="template", cascade="all, delete-orphan", order_by="GroupItem.sort_order")
+    items: Mapped[list["GroupItem"]] = relationship(
+        back_populates="template", cascade="save-update, merge, refresh-expire, expunge",
+        order_by="GroupItem.sort_order",
+        primaryjoin="and_(GroupTemplate.id == GroupItem.template_id, GroupItem.deleted_at.is_(None))",
+    )
 
 
 class GroupItem(Base):
@@ -23,5 +29,6 @@ class GroupItem(Base):
     description: Mapped[str] = mapped_column(Text, default="")
     max_participants: Mapped[int] = mapped_column(Integer, default=0)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     template: Mapped[GroupTemplate] = relationship(back_populates="items")
