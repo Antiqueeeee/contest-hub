@@ -266,8 +266,6 @@ async def update_contest_status(db: AsyncSession, contest_id: int, new_status: s
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"不能从 {contest.status.value} 转换为 {new_status}")
 
     contest.status = target
-    if target == ContestStatus.cancelled:
-        contest.status = ContestStatus.cancelled
     await db.commit()
     await db.refresh(contest)
     return contest
@@ -286,6 +284,8 @@ async def copy_contest(db: AsyncSession, contest_id: int, creator_id: int) -> Co
         registration_start=original.registration_start,
         registration_end=original.registration_end,
         max_participants=original.max_participants,
+        score_categories=original.score_categories,
+        timezone=original.timezone,
     )
     db.add(new_contest)
     await db.flush()

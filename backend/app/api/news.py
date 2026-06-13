@@ -56,9 +56,13 @@ async def list_news(
     return {"items": result, "total": total, "page": page, "page_size": page_size}
 
 
-@admin_router.get("/{news_id}", response_model=NewsOut)
+@admin_router.get("/{news_id}")
 async def get_news_detail(news_id: int, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    return await news_service.get_news(db, news_id)
+    n = await news_service.get_news(db, news_id)
+    d = NewsOut.model_validate(n).model_dump()
+    if n.category:
+        d['category_name'] = n.category.name
+    return d
 
 
 @admin_router.post("", response_model=NewsOut)
@@ -97,6 +101,10 @@ async def public_news_list(page: int = Query(default=1, ge=1), page_size: int = 
     return {"items": result, "total": total}
 
 
-@public_router.get("/news/{news_id}", response_model=NewsOut)
+@public_router.get("/news/{news_id}")
 async def public_news_detail(news_id: int, db: AsyncSession = Depends(get_db)):
-    return await news_service.get_public_news_detail(db, news_id)
+    n = await news_service.get_public_news_detail(db, news_id)
+    d = NewsOut.model_validate(n).model_dump()
+    if n.category:
+        d['category_name'] = n.category.name
+    return d
