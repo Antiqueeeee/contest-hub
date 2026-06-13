@@ -64,11 +64,11 @@ export default function ExportPage() {
       let attempts = 0
       while (attempts < 30) {
         await new Promise(r => setTimeout(r, 1000))
-        const task = await api.get<{ status: string; task_id: string }>(`/admin/export/tasks/${res.task_id}`)
+        const task = await api.get<{ status: string; task_id: string; filename: string }>(`/admin/export/tasks/${res.task_id}`)
         if (task.status === 'completed') {
           // Download via the API proxy (not hardcoded localhost) so it works across deployments
           const blob = await api.getBlob(`/admin/export/download/${res.task_id}`)
-          const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `export_${res.task_id}.xlsx`; a.click()
+          const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = task.filename || `export_${res.task_id}.xlsx`; a.click()
           return
         }
         if (task.status === 'failed') { alert('导出失败，请重试'); return }

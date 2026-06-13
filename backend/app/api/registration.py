@@ -67,7 +67,7 @@ async def get_task_status(task_id: str, current_user: dict = Depends(get_current
     if not task:
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="任务不存在")
-    return {"task_id": task_id, "status": task["status"]}
+    return {"task_id": task_id, "status": task["status"], "filename": task.get("filename", "")}
 
 
 @export_router.get("/download/{task_id}")

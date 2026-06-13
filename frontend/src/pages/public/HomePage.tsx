@@ -55,9 +55,9 @@ export default function HomePage() {
           <div className="max-w-2xl">
             <h1 className="text-4xl md:text-5xl font-extrabold leading-tight mb-4">发现并参与<br />精彩竞赛</h1>
             <p className="text-lg text-white/80 mb-8">浏览赛事信息，在线报名，赛后自助查询成绩</p>
-            <a href="/#contests" className="inline-flex items-center gap-2 px-6 py-3 bg-white text-primary rounded-xl font-semibold hover:shadow-lg transition-shadow no-underline">
+            <Link to="/contests" className="inline-flex items-center gap-2 px-6 py-3 bg-white text-primary rounded-xl font-semibold hover:shadow-lg transition-shadow no-underline">
               浏览赛事 <ArrowRight className="h-4 w-4" />
-            </a>
+            </Link>
           </div>
         </div>
       </section>
