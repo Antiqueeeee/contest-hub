@@ -92,8 +92,10 @@ async def download_template(
     wb.save(output)
     output.seek(0)
     from urllib.parse import quote
+    from datetime import datetime, timezone
     safe_title = contest.title.replace('/', '_').replace('\\', '_') if contest else f"赛事{contest_id}"
-    filename = f"{safe_title}_成绩导入模板.xlsx"
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    filename = f"{safe_title}_成绩导入模板_{timestamp}.xlsx"
     encoded = quote(filename)
     return StreamingResponse(output, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                              headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded}"})
