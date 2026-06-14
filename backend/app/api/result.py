@@ -97,8 +97,9 @@ async def download_template(
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     filename = f"{safe_title}_成绩导入模板_{timestamp}.xlsx"
     encoded = quote(filename)
-    return StreamingResponse(output, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                             headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded}"})
+    response = StreamingResponse(output, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{encoded}"
+    return response
 
 
 # ── Import helpers ───────────────────────────────────────────────
