@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Plus, Pencil, Trash2, ChevronUp, ChevronDown, Upload, GripVertical } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronUp, ChevronDown, Upload, GripVertical, Settings } from 'lucide-react'
 
 interface SlideItem {
   id: number
@@ -19,6 +19,15 @@ interface SlideItem {
   updated_at: string
 }
 
+interface UploadResult {
+  url: string
+  filename: string
+  size: number
+  width: number
+  height: number
+}
+
+const HEIGHT_OPTIONS = [300, 350, 400, 450, 500]
 const EMPTY_FORM = { title: '', image_url: '', link_url: '', sort_order: 0, is_active: true }
 
 export default function CarouselPage() {
@@ -32,20 +41,46 @@ export default function CarouselPage() {
   const [, setDragId] = useState<number | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
+  // Carousel height setting
+  const [carouselHeight, setCarouselHeight] = useState(400)
+  const [heightLoaded, setHeightLoaded] = useState(false)
+  const [heightSaving, setHeightSaving] = useState(false)
+
+  // Image dimensions from last upload
+  const [lastUploadDims, setLastUploadDims] = useState<{ width: number; height: number } | null>(null)
+
   const fetchSlides = () => {
     api.get<{ items: SlideItem[] }>('/admin/carousel').then(r => setSlides(r.items)).catch(console.error).finally(() => setLoading(false))
   }
 
-  useEffect(() => { fetchSlides() }, [])
+  useEffect(() => {
+    fetchSlides()
+    // Load existing height setting
+    api.get<{ content: string }>('/admin/site-content/carousel_height').then(r => {
+      const h = parseInt(r.content)
+      if (h >= 200 && h <= 800) setCarouselHeight(h)
+    }).catch(() => {}).finally(() => setHeightLoaded(true))
+  }, [])
+
+  const saveHeight = async () => {
+    setHeightSaving(true)
+    try {
+      await api.put('/admin/site-content/carousel_height', { content: String(carouselHeight) })
+    } catch (err: any) {
+      alert(err.message || '保存失败')
+    } finally { setHeightSaving(false) }
+  }
 
   const openNew = () => {
     setEditingId(null)
+    setLastUploadDims(null)
     setForm({ ...EMPTY_FORM, sort_order: slides.length })
     setDialogOpen(true)
   }
 
   const openEdit = (s: SlideItem) => {
     setEditingId(s.id)
+    setLastUploadDims(null)
     setForm({ title: s.title, image_url: s.image_url, link_url: s.link_url, sort_order: s.sort_order, is_active: s.is_active })
     setDialogOpen(true)
   }
@@ -55,8 +90,11 @@ export default function CarouselPage() {
     if (!file) return
     setUploading(true)
     try {
-      const res = await api.upload<{ url: string }>('/admin/upload', file)
+      const res = await api.upload<UploadResult>('/admin/upload', file)
       setForm(f => ({ ...f, image_url: res.url }))
+      if (res.width && res.height) {
+        setLastUploadDims({ width: res.width, height: res.height })
+      }
     } catch (err: any) {
       alert(err.message || '上传失败')
     } finally { setUploading(false) }
@@ -104,12 +142,11 @@ export default function CarouselPage() {
     const [moved] = updated.splice(index, 1)
     updated.splice(target, 0, moved)
     const items = updated.map((s, i) => ({ id: s.id, sort_order: i }))
-    // Optimistic update
     setSlides(updated.map((s, i) => ({ ...s, sort_order: i })))
     try {
       await api.put('/admin/carousel/reorder', { items })
     } catch {
-      fetchSlides() // rollback
+      fetchSlides()
     }
   }
 
@@ -118,13 +155,10 @@ export default function CarouselPage() {
   const handleDrop = (targetId: number) => {
     setDragId(null)
     const srcIdx = slides.findIndex(s => s.id === targetId)
-    // ... simplified: reorder is handled by move buttons; drag just highlights
-    // In a real implementation we'd compute the new order from drag state
-    // For now, up/down buttons handle reordering reliably
     if (srcIdx < 0) return
   }
 
-  if (loading) return <div className="text-center py-20 text-muted-foreground">加载中...</div>
+  if (loading || !heightLoaded) return <div className="text-center py-20 text-muted-foreground">加载中...</div>
 
   return (
     <div className="space-y-4 max-w-4xl">
@@ -138,6 +172,27 @@ export default function CarouselPage() {
           添加轮播图
         </Button>
       </div>
+
+      {/* Carousel display settings */}
+      <Card>
+        <CardContent className="flex items-center gap-4 p-4">
+          <Settings className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+          <Label className="flex-shrink-0 text-sm">首页轮播高度</Label>
+          <select
+            value={carouselHeight}
+            onChange={e => setCarouselHeight(Number(e.target.value))}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            {HEIGHT_OPTIONS.map(h => (
+              <option key={h} value={h}>{h}px</option>
+            ))}
+          </select>
+          <Button variant="outline" size="sm" onClick={saveHeight} disabled={heightSaving}>
+            {heightSaving ? '保存中...' : '应用'}
+          </Button>
+          <span className="text-xs text-muted-foreground">所有轮播图统一以此高度显示，宽度自适应</span>
+        </CardContent>
+      </Card>
 
       {slides.length === 0 ? (
         <Card>
@@ -161,27 +216,22 @@ export default function CarouselPage() {
               className={`overflow-hidden transition-opacity ${!s.is_active ? 'opacity-50' : ''}`}
             >
               <CardContent className="flex items-center gap-4 p-4">
-                {/* Drag handle */}
                 <div className="cursor-grab text-muted-foreground/40 hover:text-muted-foreground flex-shrink-0">
                   <GripVertical className="h-5 w-5" />
                 </div>
 
-                {/* Thumbnail */}
                 <div className="h-16 w-28 flex-shrink-0 rounded-md overflow-hidden bg-muted">
                   <img src={s.image_url} alt={s.title} className="h-full w-full object-cover" />
                 </div>
 
-                {/* Info */}
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm truncate">{s.title || '未命名'}</p>
                   <p className="text-xs text-muted-foreground truncate">{s.image_url}</p>
                   {s.link_url && <p className="text-xs text-muted-foreground truncate">链接: {s.link_url}</p>}
                 </div>
 
-                {/* Sort order badge */}
                 <span className="text-xs text-muted-foreground flex-shrink-0 w-8 text-center">#{s.sort_order + 1}</span>
 
-                {/* Actions */}
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => move(i, -1)} disabled={i === 0}>
                     <ChevronUp className="h-4 w-4" />
@@ -233,6 +283,13 @@ export default function CarouselPage() {
                 <div className="h-32 rounded-md overflow-hidden bg-muted mt-2">
                   <img src={form.image_url} alt="预览" className="h-full w-full object-cover" />
                 </div>
+              )}
+              {/* Show uploaded image dimensions for reference */}
+              {lastUploadDims && (
+                <p className="text-xs text-muted-foreground">
+                  图片尺寸：<span className="font-medium text-foreground">{lastUploadDims.width} × {lastUploadDims.height}</span> px
+                  <span className="ml-2">— 当前轮播高度 <span className="font-medium text-foreground">{carouselHeight}px</span>，如需调整请返回页面顶部修改</span>
+                </p>
               )}
             </div>
 

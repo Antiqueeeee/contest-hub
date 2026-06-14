@@ -34,6 +34,7 @@ export default function HomePage() {
   const [news, setNews] = useState<NewsItem[]>([])
   const [contests, setContests] = useState<ContestItem[]>([])
   const [slides, setSlides] = useState<CarouselSlide[]>([])
+  const [carouselHeight, setCarouselHeight] = useState(400)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -41,7 +42,8 @@ export default function HomePage() {
       api.get<{ items: NewsItem[] }>('/public/news'),
       api.get<{ items: ContestItem[] }>('/public/contests'),
       api.get<{ items: CarouselSlide[] }>('/public/carousel').then(r => r.items).catch(() => [] as CarouselSlide[]),
-    ]).then(([n, c, s]) => { setNews(n.items); setContests(c.items); setSlides(s) }).catch(console.error).finally(() => setLoading(false))
+      api.get<{ content: string }>('/public/site-content/carousel_height').then(r => parseInt(r.content) || 400).catch(() => 400),
+    ]).then(([n, c, s, h]) => { setNews(n.items); setContests(c.items); setSlides(s); setCarouselHeight(h) }).catch(console.error).finally(() => setLoading(false))
     const hash = window.location.hash
     if (hash) setTimeout(() => document.querySelector(hash)?.scrollIntoView({ behavior: 'smooth' }), 300)
   }, [])
@@ -54,7 +56,7 @@ export default function HomePage() {
     <div>
       {/* Carousel (replaces Hero when slides exist) */}
       {slides.length > 0 ? (
-        <Carousel slides={slides} className="mb-8" />
+        <Carousel slides={slides} height={carouselHeight} className="mb-8" />
       ) : (
         <section style={heroGradient} className="text-white">
           <div className="max-w-6xl mx-auto px-6 py-16 md:py-24">

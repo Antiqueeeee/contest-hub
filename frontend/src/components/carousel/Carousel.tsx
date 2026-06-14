@@ -12,12 +12,13 @@ export interface CarouselSlide {
 
 interface CarouselProps {
   slides: CarouselSlide[]
+  height?: number
   autoplay?: boolean
   interval?: number
   className?: string
 }
 
-export default function Carousel({ slides, autoplay = true, interval = 5000, className = '' }: CarouselProps) {
+export default function Carousel({ slides, height = 400, autoplay = true, interval = 5000, className = '' }: CarouselProps) {
   const [current, setCurrent] = useState(0)
   const [isHovered, setIsHovered] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -73,7 +74,7 @@ export default function Carousel({ slides, autoplay = true, interval = 5000, cla
             <div
               key={slide.id}
               className="w-full flex-shrink-0 relative"
-              style={{ aspectRatio: '16 / 5' }}
+              style={{ height: `${height}px` }}
             >
               <img
                 src={slide.image_url}
@@ -93,7 +94,7 @@ export default function Carousel({ slides, autoplay = true, interval = 5000, cla
                 href={slide.link_url}
                 rel="noopener noreferrer"
                 className="w-full flex-shrink-0 block"
-                style={{ aspectRatio: '16 / 5' }}
+                style={{ height: `${height}px` }}
               >
                 {inner.props.children}
               </a>

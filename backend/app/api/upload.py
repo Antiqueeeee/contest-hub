@@ -53,23 +53,25 @@ def _validate_image(file: UploadFile) -> None:
         raise HTTPException(400, f"图片大小不能超过 {settings.upload_max_size_mb}MB")
 
 
-def _secure_strip_exif(file_path: str) -> None:
-    """Strip EXIF metadata from the saved image (privacy)."""
+def _process_image(file_path: str) -> tuple[int, int]:
+    """Strip EXIF and return (width, height). Best-effort — never fails the upload."""
     try:
         from PIL import Image
         img = Image.open(file_path)
+        w, h = img.size
         # Re-save without EXIF by creating a clean copy
         data = list(img.getdata())
         clean = Image.new(img.mode, img.size)
         clean.putdata(data)
         clean.save(file_path)
+        return w, h
     except Exception:
-        pass  # best-effort, don't fail the upload over EXIF stripping
+        return 0, 0
 
 
 @router.post("")
 async def upload_file(file: UploadFile, _current_user: dict = Depends(get_current_user)):
-    """Upload an image file. Returns {url} for the saved file."""
+    """Upload an image file. Returns {url, filename, size, width, height}."""
     if not file.filename:
         raise HTTPException(400, "未选择文件")
 
@@ -87,8 +89,8 @@ async def upload_file(file: UploadFile, _current_user: dict = Depends(get_curren
     content = await file.read()
     file_path.write_bytes(content)
 
-    # Strip EXIF (best-effort, privacy)
-    _secure_strip_exif(str(file_path))
+    # Strip EXIF and get dimensions (best-effort)
+    width, height = _process_image(str(file_path))
 
     url = f"/uploads/{safe_name}"
-    return {"url": url, "filename": safe_name, "size": len(content)}
+    return {"url": url, "filename": safe_name, "size": len(content), "width": width, "height": height}
