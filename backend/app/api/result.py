@@ -88,10 +88,6 @@ async def download_template(
         ws.cell(row=row_idx, column=1, value=reg.registration_number)
         ws.cell(row=row_idx, column=2, value=reg.form_data.get("name", ""))
 
-    output = io.BytesIO()
-    wb.save(output)
-    output.seek(0)
-    from urllib.parse import quote
     from datetime import datetime, timezone
     safe_title = contest.title.replace('/', '_').replace('\\', '_') if contest else f"赛事{contest_id}"
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")

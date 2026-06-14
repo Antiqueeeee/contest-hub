@@ -40,6 +40,20 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json()
 }
 
+function parseFilename(headers: Headers): string | null {
+  const cd = headers.get('content-disposition')
+  if (!cd) return null
+  // Try filename*= (RFC 5987) first: filename*=UTF-8''percent-encoded
+  const starMatch = cd.match(/filename\*=(?:UTF-8|utf-8)''([^;\s]+)/)
+  if (starMatch) {
+    try { return decodeURIComponent(starMatch[1]) } catch { /* fall through */ }
+  }
+  // Fall back to plain filename=
+  const plainMatch = cd.match(/filename="?([^";\s]+)"?/)
+  if (plainMatch) return plainMatch[1]
+  return null
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined }),
@@ -47,8 +61,9 @@ export const api = {
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 
-  /** Download a file as a Blob (e.g. export files).  Uses the same auth token as other requests. */
-  getBlob: async (path: string): Promise<Blob> => {
+  /** Download a file as a Blob (e.g. export files).  Uses the same auth token as other requests.
+   *  Returns { blob, filename } where filename is extracted from Content-Disposition (if present). */
+  getBlob: async (path: string): Promise<{ blob: Blob; filename: string | null }> => {
     const token = getToken()
     const headers: Record<string, string> = {}
     if (token) headers['Authorization'] = `Bearer ${token}`
@@ -58,7 +73,9 @@ export const api = {
       const err = await res.json().catch(() => ({ detail: res.statusText }))
       throw new Error(err.detail || `HTTP ${res.status}`)
     }
-    return res.blob()
+    const blob = await res.blob()
+    const filename = parseFilename(res.headers)
+    return { blob, filename }
   },
 
   /** Upload a file via multipart/form-data.  Returns parsed JSON response. */

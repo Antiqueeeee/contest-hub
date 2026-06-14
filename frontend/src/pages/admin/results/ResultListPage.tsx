@@ -115,8 +115,8 @@ export default function ResultListPage() {
 
   const handleDownloadTemplate = async () => {
     if (!contestId) return alert('请先选择赛事')
-    const blob = await api.getBlob(`/admin/results/template?contest_id=${contestId}`)
-    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'template.xlsx'; a.click()
+    const { blob, filename } = await api.getBlob(`/admin/results/template?contest_id=${contestId}`)
+    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename || 'template.xlsx'; a.click()
   }
 
   const handleImport = async () => {

@@ -67,7 +67,7 @@ export default function ExportPage() {
         const task = await api.get<{ status: string; task_id: string; filename: string }>(`/admin/export/tasks/${res.task_id}`)
         if (task.status === 'completed') {
           // Download via the API proxy (not hardcoded localhost) so it works across deployments
-          const blob = await api.getBlob(`/admin/export/download/${res.task_id}`)
+          const { blob } = await api.getBlob(`/admin/export/download/${res.task_id}`)
           const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = task.filename || `export_${res.task_id}.xlsx`; a.click()
           return
         }
