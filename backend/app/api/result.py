@@ -1,6 +1,6 @@
 import io
 from fastapi import APIRouter, Depends, Query, UploadFile, File, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from openpyxl import load_workbook
 from openpyxl.worksheet.worksheet import Worksheet
@@ -96,14 +96,13 @@ async def download_template(
     safe_title = contest.title.replace('/', '_').replace('\\', '_') if contest else f"赛事{contest_id}"
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     cn_filename = f"{safe_title}_成绩导入模板_{timestamp}.xlsx"
-    # Plain filename uses ASCII fallback (browsers handle percent-encoded UTF-8
-    # inconsistently); the full Chinese name goes in filename* (RFC 5987).
     ascii_fallback = f"contest{contest_id}_import_template_{timestamp}.xlsx"
-    response = StreamingResponse(output, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    response.headers["Content-Disposition"] = (
-        f"attachment; filename={ascii_fallback}; filename*=UTF-8''{quote(cn_filename)}"
+    encoded = quote(cn_filename)
+    return Response(
+        content=output.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={ascii_fallback}; filename*=UTF-8''{encoded}"},
     )
-    return response
 
 
 # ── Import helpers ───────────────────────────────────────────────
