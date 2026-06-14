@@ -173,7 +173,8 @@ async def submit_export_task(
     contest = ct.scalar_one_or_none()
     contest_title = contest.title.replace('/', '_').replace('\\', '_') if contest else f"赛事{contest_id}"
     type_label = "报名数据" if export_type == "registration" else "成绩数据"
-    download_filename = f"{contest_title}_{type_label}.xlsx"
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    download_filename = f"{contest_title}_{type_label}_{timestamp}.xlsx"
 
     _export_tasks[task_id] = {
         "status": "processing", "file_path": None,
