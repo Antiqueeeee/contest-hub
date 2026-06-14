@@ -9,7 +9,7 @@ class ResultFilter(BaseModel):
     is_published: bool | None = None
     keyword: str = ""
     page: int = Field(default=1, ge=1)
-    page_size: int = Field(default=20, ge=1, le=100)
+    page_size: int = Field(default=20, ge=1, le=50000)
 
 
 class ResultCreate(BaseModel):
