@@ -1,6 +1,6 @@
-import io
+import io, os, tempfile
 from fastapi import APIRouter, Depends, Query, UploadFile, File, HTTPException, Request
-from fastapi.responses import Response
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from openpyxl import load_workbook
 from openpyxl.worksheet.worksheet import Worksheet
@@ -96,13 +96,11 @@ async def download_template(
     safe_title = contest.title.replace('/', '_').replace('\\', '_') if contest else f"赛事{contest_id}"
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     filename = f"{safe_title}_成绩导入模板_{timestamp}.xlsx"
-    encoded = quote(filename)
-    response = Response(
-        content=output.getvalue(),
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
-    response.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{encoded}"
-    return response
+
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    wb.save(tmp.name)
+    return FileResponse(tmp.name, filename=filename,
+                       media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
 # ── Import helpers ───────────────────────────────────────────────
