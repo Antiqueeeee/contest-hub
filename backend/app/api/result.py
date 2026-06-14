@@ -95,10 +95,14 @@ async def download_template(
     from datetime import datetime, timezone
     safe_title = contest.title.replace('/', '_').replace('\\', '_') if contest else f"赛事{contest_id}"
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    filename = f"{safe_title}_成绩导入模板_{timestamp}.xlsx"
-    encoded = quote(filename)
+    cn_filename = f"{safe_title}_成绩导入模板_{timestamp}.xlsx"
+    # Plain filename uses ASCII fallback (browsers handle percent-encoded UTF-8
+    # inconsistently); the full Chinese name goes in filename* (RFC 5987).
+    ascii_fallback = f"contest{contest_id}_import_template_{timestamp}.xlsx"
     response = StreamingResponse(output, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    response.headers["Content-Disposition"] = f"attachment; filename={encoded}; filename*=UTF-8''{encoded}"
+    response.headers["Content-Disposition"] = (
+        f"attachment; filename={ascii_fallback}; filename*=UTF-8''{quote(cn_filename)}"
+    )
     return response
 
 
