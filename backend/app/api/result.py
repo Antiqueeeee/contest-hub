@@ -98,7 +98,7 @@ async def download_template(
     filename = f"{safe_title}_成绩导入模板_{timestamp}.xlsx"
     encoded = quote(filename)
     response = StreamingResponse(output, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    response.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{encoded}"
+    response.headers["Content-Disposition"] = f"attachment; filename={encoded}; filename*=UTF-8''{encoded}"
     return response
 
 
