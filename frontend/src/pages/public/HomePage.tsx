@@ -4,6 +4,7 @@ import { api } from '@/api/client'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Calendar, MapPin, Users, ArrowRight } from 'lucide-react'
+import Carousel, { type CarouselSlide } from '@/components/carousel/Carousel'
 
 interface NewsItem { id: number; title: string; category_id: number; category_name: string; is_pinned: boolean; status: string; published_at: string | null }
 interface ContestItem { id: number; title: string; description: string; status: string; start_date: string; end_date: string; location: string; max_participants: number; registration_start: string; registration_end: string; is_registration_open?: boolean; is_upcoming?: boolean }
@@ -32,13 +33,15 @@ function getEffectiveStatus(c: ContestItem): { label: string; cls: string } {
 export default function HomePage() {
   const [news, setNews] = useState<NewsItem[]>([])
   const [contests, setContests] = useState<ContestItem[]>([])
+  const [slides, setSlides] = useState<CarouselSlide[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     Promise.all([
       api.get<{ items: NewsItem[] }>('/public/news'),
       api.get<{ items: ContestItem[] }>('/public/contests'),
-    ]).then(([n, c]) => { setNews(n.items); setContests(c.items) }).catch(console.error).finally(() => setLoading(false))
+      api.get<{ items: CarouselSlide[] }>('/public/carousel').then(r => r.items).catch(() => [] as CarouselSlide[]),
+    ]).then(([n, c, s]) => { setNews(n.items); setContests(c.items); setSlides(s) }).catch(console.error).finally(() => setLoading(false))
     const hash = window.location.hash
     if (hash) setTimeout(() => document.querySelector(hash)?.scrollIntoView({ behavior: 'smooth' }), 300)
   }, [])
@@ -49,18 +52,22 @@ export default function HomePage() {
 
   return (
     <div>
-      {/* Hero */}
-      <section style={heroGradient} className="text-white">
-        <div className="max-w-6xl mx-auto px-6 py-16 md:py-24">
-          <div className="max-w-2xl">
-            <h1 className="text-4xl md:text-5xl font-extrabold leading-tight mb-4">发现并参与<br />精彩竞赛</h1>
-            <p className="text-lg text-white/80 mb-8">浏览赛事信息，在线报名，赛后自助查询成绩</p>
-            <Link to="/contests" className="inline-flex items-center gap-2 px-6 py-3 bg-white text-primary rounded-xl font-semibold hover:shadow-lg transition-shadow no-underline">
-              浏览赛事 <ArrowRight className="h-4 w-4" />
-            </Link>
+      {/* Carousel (replaces Hero when slides exist) */}
+      {slides.length > 0 ? (
+        <Carousel slides={slides} className="mb-8" />
+      ) : (
+        <section style={heroGradient} className="text-white">
+          <div className="max-w-6xl mx-auto px-6 py-16 md:py-24">
+            <div className="max-w-2xl">
+              <h1 className="text-4xl md:text-5xl font-extrabold leading-tight mb-4">发现并参与<br />精彩竞赛</h1>
+              <p className="text-lg text-white/80 mb-8">浏览赛事信息，在线报名，赛后自助查询成绩</p>
+              <Link to="/contests" className="inline-flex items-center gap-2 px-6 py-3 bg-white text-primary rounded-xl font-semibold hover:shadow-lg transition-shadow no-underline">
+                浏览赛事 <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* News */}
       <section id="news" className="max-w-6xl mx-auto px-6 mt-14">

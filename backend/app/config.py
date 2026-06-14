@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     # CORS
     allowed_origins: str = "http://localhost:5173"
 
+    # Upload
+    upload_dir: str = "./uploads"
+    upload_max_size_mb: int = 10
+
     # Export
     export_dir: str = "./exports"
     export_retention_days: int = 7

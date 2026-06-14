@@ -1,6 +1,8 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.database import init_db
@@ -12,6 +14,8 @@ from app.api.result import admin_router as result_admin_router, public_router as
 from app.api.contestant import router as contestant_router
 from app.api.site_content import admin_router as site_content_admin, public_router as site_content_public
 from app.api.groups import router as groups_router
+from app.api.upload import router as upload_router
+from app.api.carousel import admin_router as carousel_admin_router, public_router as carousel_public_router
 
 
 @asynccontextmanager
@@ -60,6 +64,18 @@ app.include_router(site_content_public)
 
 # Groups
 app.include_router(groups_router)
+
+# Upload
+app.include_router(upload_router)
+
+# Carousel
+app.include_router(carousel_admin_router)
+app.include_router(carousel_public_router)
+
+# Static files: serve uploaded images
+_upload_dir = Path(get_settings().upload_dir)
+_upload_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(_upload_dir)), name="uploads")
 
 
 @app.get("/api/health")

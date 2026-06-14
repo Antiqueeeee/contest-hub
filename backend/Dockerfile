@@ -16,8 +16,8 @@ RUN pip install --no-cache-dir --upgrade pip -i https://mirrors.aliyun.com/pypi/
 # Copy app code
 COPY . .
 
-# Create exports directory
-RUN mkdir -p /app/exports
+# Create exports and uploads directories
+RUN mkdir -p /app/exports /app/uploads
 
 # Entrypoint script (runs seed, then starts server)
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh

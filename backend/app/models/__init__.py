@@ -6,6 +6,7 @@ from app.models.registration import Registration
 from app.models.result import Result
 from app.models.site_content import SiteContent
 from app.models.group_template import GroupTemplate, GroupItem
+from app.models.carousel_slide import CarouselSlide
 
 __all__ = [
     "User",
@@ -13,4 +14,5 @@ __all__ = [
     "Contest", "ContestGroup", "Award", "ContestField",
     "Registration",
     "Result",
+    "CarouselSlide",
 ]
