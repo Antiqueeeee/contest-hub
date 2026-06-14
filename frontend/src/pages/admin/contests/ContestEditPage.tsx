@@ -4,7 +4,7 @@ import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
+import RichTextEditor from '@/components/editor/RichTextEditor'
 import { Switch } from '@/components/ui/switch'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -148,7 +148,7 @@ export default function ContestEditPage() {
         <CardHeader><CardTitle className="text-base">基本信息</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-1"><Label>赛事标题 <span className="text-destructive">*</span></Label><Input value={title} onChange={e => setTitle(e.target.value)} maxLength={200} /></div>
-          <div className="space-y-1"><Label>赛事介绍</Label><Textarea value={description} onChange={e => setDescription(e.target.value)} className="min-h-[80px]" /></div>
+          <div className="space-y-1"><Label>赛事介绍</Label><RichTextEditor value={description} onChange={setDescription} minHeight="200px" placeholder="赛事介绍、规则说明等..." /></div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1"><Label>比赛地点</Label><Input value={location} onChange={e => setLocation(e.target.value)} /></div>
             <div className="space-y-1"><Label>人数上限（0=不限）</Label><Input type="number" value={maxParticipants} onChange={e => setMaxParticipants(e.target.value)} /></div>

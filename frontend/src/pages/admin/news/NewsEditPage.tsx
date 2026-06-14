@@ -4,7 +4,7 @@ import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
+import RichTextEditor from '@/components/editor/RichTextEditor'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface Category { id: number; name: string }
@@ -64,7 +64,7 @@ export default function NewsEditPage() {
             </select>
           </div>
           <div className="space-y-1"><Label>正文</Label>
-            <Textarea value={content} onChange={e => setContent(e.target.value)} className="min-h-[300px] font-mono text-sm" placeholder="支持 HTML 格式" />
+            <RichTextEditor value={content} onChange={setContent} minHeight="300px" placeholder="支持 HTML 格式" />
           </div>
         </CardContent>
       </Card>

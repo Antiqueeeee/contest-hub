@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
+import RichTextEditor from '@/components/editor/RichTextEditor'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Lightbulb, Copy, Check } from 'lucide-react'
 
@@ -161,10 +161,10 @@ export default function SiteContentPage() {
             <p className="text-sm text-muted-foreground py-8 text-center">加载中...</p>
           ) : (
             <>
-              <Textarea
+              <RichTextEditor
                 value={content}
-                onChange={e => setContent(e.target.value)}
-                className="min-h-[420px] font-mono text-sm"
+                onChange={setContent}
+                minHeight="420px"
                 placeholder="<h1>标题</h1><p>正文内容...</p>"
               />
               <div className="flex items-center justify-between">
