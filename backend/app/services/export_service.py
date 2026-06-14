@@ -10,7 +10,7 @@ from app.config import get_settings
 from app.services.registration_service import get_registrations_for_export
 from app.services.result_service import list_results
 from app.schemas.result import ResultFilter
-from app.utils.crypto import decrypt_value, mask_id_number
+from app.utils.crypto import decrypt_value
 
 # Chinese field name mapping
 FIELD_LABELS = {
@@ -82,8 +82,7 @@ def _write_registration_rows(
             elif name == "email":
                 val = form_data.get("email", "")
             elif name == "id_number":
-                raw = decrypt_value(form_data.get("id_number", ""))
-                val = mask_id_number(raw)
+                val = decrypt_value(form_data.get("id_number", ""))
             elif name == "organization":
                 val = form_data.get("organization", "")
             elif name == "group_id":
@@ -121,8 +120,7 @@ async def _write_result_rows(
             elif name == "email":
                 val = form_data.get("email", "")
             elif name == "id_number":
-                raw = decrypt_value(form_data.get("id_number", ""))
-                val = mask_id_number(raw)
+                val = decrypt_value(form_data.get("id_number", ""))
             elif name == "organization":
                 val = form_data.get("organization", "")
             elif name == "total_score":
