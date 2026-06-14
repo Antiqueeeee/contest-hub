@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.middleware.auth import get_current_user
 from app.schemas.contest import ContestCreate, ContestUpdate, ContestOut
 from app.services import contest_service
+from app.utils.audit import log_event
 
 admin_router = APIRouter(prefix="/api/admin/contests", tags=["赛事管理"])
 public_router = APIRouter(prefix="/api/public/contests", tags=["前台赛事"])
@@ -28,29 +29,42 @@ async def get_contest(contest_id: int, db: AsyncSession = Depends(get_db), curre
 
 
 @admin_router.post("", response_model=ContestOut, status_code=201)
-async def create_contest(data: ContestCreate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    return await contest_service.create_contest(db, data, current_user["user_id"])
+async def create_contest(data: ContestCreate, request: Request, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    result = await contest_service.create_contest(db, data, current_user["user_id"])
+    await log_event(db, "create_contest", operator=current_user["username"], operator_id=current_user["user_id"],
+                    target=result.title, target_type="contest", result="success", request=request)
+    return result
 
 
 @admin_router.put("/{contest_id}", response_model=ContestOut)
-async def update_contest(contest_id: int, data: ContestUpdate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    return await contest_service.update_contest(db, contest_id, data)
+async def update_contest(contest_id: int, data: ContestUpdate, request: Request, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    result = await contest_service.update_contest(db, contest_id, data)
+    await log_event(db, "update_contest", operator=current_user["username"], operator_id=current_user["user_id"],
+                    target=str(contest_id), target_type="contest", result="success", request=request)
+    return result
 
 
 @admin_router.patch("/{contest_id}/status")
-async def update_status(contest_id: int, status: str = Query(...), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+async def update_status(contest_id: int, request: Request, status: str = Query(...), db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     contest = await contest_service.update_contest_status(db, contest_id, status)
+    await log_event(db, "update_contest_status", operator=current_user["username"], operator_id=current_user["user_id"],
+                    target=str(contest_id), target_type="contest", detail={"new_status": status}, result="success", request=request)
     return {"message": "状态已更新", "status": contest.status.value}
 
 
 @admin_router.post("/{contest_id}/copy", response_model=ContestOut)
-async def copy_contest(contest_id: int, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    return await contest_service.copy_contest(db, contest_id, current_user["user_id"])
+async def copy_contest(contest_id: int, request: Request, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    result = await contest_service.copy_contest(db, contest_id, current_user["user_id"])
+    await log_event(db, "copy_contest", operator=current_user["username"], operator_id=current_user["user_id"],
+                    target=str(contest_id), target_type="contest", detail={"new_contest_id": result.id}, result="success", request=request)
+    return result
 
 
 @admin_router.delete("/{contest_id}")
-async def delete_contest(contest_id: int, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+async def delete_contest(contest_id: int, request: Request, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     await contest_service.delete_contest(db, contest_id)
+    await log_event(db, "delete_contest", operator=current_user["username"], operator_id=current_user["user_id"],
+                    target=str(contest_id), target_type="contest", result="success", request=request)
     return {"message": "赛事已删除"}
 
 

@@ -1,22 +1,33 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.middleware.contestant_auth import get_current_contestant
 from app.schemas.contestant import ContestantRegister, ContestantLogin, ContestantProfileUpdate
 from app.services import contestant_service
 from app.utils.crypto import mask_id_number
+from app.utils.audit import log_event
 
 router = APIRouter(prefix="/api", tags=["选手"])
 
 
 @router.post("/auth/contestant/register")
-async def register(data: ContestantRegister, db: AsyncSession = Depends(get_db)):
-    return await contestant_service.register_contestant(db, data)
+async def register(data: ContestantRegister, request: Request, db: AsyncSession = Depends(get_db)):
+    result = await contestant_service.register_contestant(db, data)
+    await log_event(db, "contestant_register", operator=data.email, operator_id=result["user"]["id"],
+                    result="success", request=request)
+    return result
 
 
 @router.post("/auth/contestant/login")
-async def login(data: ContestantLogin, db: AsyncSession = Depends(get_db)):
-    return await contestant_service.login_contestant(db, data.email, data.password)
+async def login(data: ContestantLogin, request: Request, db: AsyncSession = Depends(get_db)):
+    try:
+        result = await contestant_service.login_contestant(db, data.email, data.password)
+        await log_event(db, "contestant_login_success", operator=data.email, operator_id=result["user"]["id"],
+                        result="success", request=request)
+        return result
+    except HTTPException:
+        await log_event(db, "contestant_login_failed", operator=data.email, result="fail", request=request)
+        raise
 
 
 @router.get("/contestant/profile")

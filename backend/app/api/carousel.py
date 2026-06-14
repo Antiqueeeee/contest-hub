@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +11,7 @@ from app.database import get_db
 from app.middleware.auth import get_current_user
 from app.models.carousel_slide import CarouselSlide
 from app.config import get_settings
+from app.utils.audit import log_event
 
 admin_router = APIRouter(prefix="/api/admin/carousel", tags=["轮播图管理"])
 public_router = APIRouter(prefix="/api/public/carousel", tags=["前台轮播图"])
@@ -77,23 +78,24 @@ async def list_slides(db: AsyncSession = Depends(get_db), _current_user: dict = 
 
 
 @admin_router.post("")
-async def create_slide(data: CarouselSlideCreate, db: AsyncSession = Depends(get_db), _current_user: dict = Depends(get_current_user)):
+async def create_slide(data: CarouselSlideCreate, request: Request, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     _validate_link_url(data.link_url)
     slide = CarouselSlide(**data.model_dump())
     db.add(slide)
     await db.commit()
     await db.refresh(slide)
+    await log_event(db, "create_carousel", operator=current_user["username"], operator_id=current_user["user_id"],
+                    target=data.title or str(slide.id), target_type="carousel", result="success", request=request)
     return slide
 
 
 @admin_router.put("/{slide_id}")
-async def update_slide(slide_id: int, data: CarouselSlideUpdate, db: AsyncSession = Depends(get_db), _current_user: dict = Depends(get_current_user)):
+async def update_slide(slide_id: int, data: CarouselSlideUpdate, request: Request, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     _validate_link_url(data.link_url)
     result = await db.execute(select(CarouselSlide).where(CarouselSlide.id == slide_id))
     slide = result.scalar_one_or_none()
     if not slide:
         raise HTTPException(404, "轮播图不存在")
-    # If image URL changed, clean up old file
     old_url = slide.image_url
     for key, value in data.model_dump().items():
         setattr(slide, key, value)
@@ -101,11 +103,13 @@ async def update_slide(slide_id: int, data: CarouselSlideUpdate, db: AsyncSessio
         _delete_image_file(old_url)
     await db.commit()
     await db.refresh(slide)
+    await log_event(db, "update_carousel", operator=current_user["username"], operator_id=current_user["user_id"],
+                    target=str(slide_id), target_type="carousel", result="success", request=request)
     return slide
 
 
 @admin_router.delete("/{slide_id}")
-async def delete_slide(slide_id: int, db: AsyncSession = Depends(get_db), _current_user: dict = Depends(get_current_user)):
+async def delete_slide(slide_id: int, request: Request, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     result = await db.execute(select(CarouselSlide).where(CarouselSlide.id == slide_id))
     slide = result.scalar_one_or_none()
     if not slide:
@@ -113,11 +117,13 @@ async def delete_slide(slide_id: int, db: AsyncSession = Depends(get_db), _curre
     _delete_image_file(slide.image_url)
     await db.delete(slide)
     await db.commit()
+    await log_event(db, "delete_carousel", operator=current_user["username"], operator_id=current_user["user_id"],
+                    target=str(slide_id), target_type="carousel", result="success", request=request)
     return {"message": "删除成功"}
 
 
 @admin_router.put("/reorder")
-async def reorder_slides(data: ReorderRequest, db: AsyncSession = Depends(get_db), _current_user: dict = Depends(get_current_user)):
+async def reorder_slides(data: ReorderRequest, request: Request, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     ids = [item.id for item in data.items]
     rows = (await db.execute(select(CarouselSlide).where(CarouselSlide.id.in_(ids)))).scalars().all()
     slide_map = {s.id: s for s in rows}
@@ -125,6 +131,8 @@ async def reorder_slides(data: ReorderRequest, db: AsyncSession = Depends(get_db
         if item.id in slide_map:
             slide_map[item.id].sort_order = item.sort_order
     await db.commit()
+    await log_event(db, "reorder_carousel", operator=current_user["username"], operator_id=current_user["user_id"],
+                    target="carousel", target_type="carousel", detail={"order": ids}, result="success", request=request)
     return {"message": "排序已更新"}
 
 

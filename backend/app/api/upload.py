@@ -3,9 +3,10 @@ import uuid
 import imghdr
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, Request
 from app.config import get_settings
 from app.middleware.auth import get_current_user
+from app.utils.audit import log_event
 
 router = APIRouter(prefix="/api/admin/upload", tags=["文件上传"])
 
@@ -70,12 +71,19 @@ def _process_image(file_path: str) -> tuple[int, int]:
 
 
 @router.post("")
-async def upload_file(file: UploadFile, _current_user: dict = Depends(get_current_user)):
+async def upload_file(file: UploadFile, request: Request, current_user: dict = Depends(get_current_user)):
     """Upload an image file. Returns {url, filename, size, width, height}."""
     if not file.filename:
         raise HTTPException(400, "未选择文件")
 
-    _validate_image(file)
+    try:
+        _validate_image(file)
+    except HTTPException as e:
+        await log_event(None, "upload_rejected", operator=current_user["username"], operator_id=current_user["user_id"],
+                        target=file.filename or "unknown", target_type="upload",
+                        detail={"reason": e.detail, "content_type": file.content_type},
+                        result="fail", request=request)
+        raise
 
     settings = get_settings()
     upload_dir = Path(settings.upload_dir)

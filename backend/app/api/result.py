@@ -1,5 +1,5 @@
 import io
-from fastapi import APIRouter, Depends, Query, UploadFile, File, HTTPException
+from fastapi import APIRouter, Depends, Query, UploadFile, File, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from openpyxl import load_workbook
@@ -9,6 +9,7 @@ from app.database import get_db
 from app.middleware.auth import get_current_user
 from app.schemas.result import ResultCreate, ResultOut, ResultQueryRequest, ResultFilter
 from app.services import result_service
+from app.utils.audit import log_event
 
 admin_router = APIRouter(prefix="/api/admin/results", tags=["成绩管理"])
 public_router = APIRouter(prefix="/api/public/contests", tags=["前台成绩"])
@@ -196,6 +197,7 @@ async def _process_import_row(
 
 @admin_router.post("/import")
 async def import_results(
+    request: Request,
     contest_id: int = Query(...),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
@@ -226,23 +228,35 @@ async def import_results(
         else:
             errors.append({"row": row_idx, "error": error_msg})
 
+    await log_event(db, "import_results", operator=current_user["username"], operator_id=current_user["user_id"],
+                    target=f"contest/{contest_id}", target_type="result",
+                    detail={"success_count": success_count, "error_count": len(errors)},
+                    result="success", request=request)
     return {"success_count": success_count, "error_count": len(errors), "errors": errors[:20]}
 
 
 @admin_router.post("", response_model=ResultOut)
-async def create_result(data: ResultCreate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    return await result_service.create_or_update_result(db, data)
+async def create_result(data: ResultCreate, request: Request, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    result = await result_service.create_or_update_result(db, data)
+    await log_event(db, "upsert_result", operator=current_user["username"], operator_id=current_user["user_id"],
+                    target=f"contest/{data.contest_id}/reg/{data.registration_id}", target_type="result",
+                    result="success", request=request)
+    return result
 
 
 @admin_router.patch("/{result_id}/publish")
-async def publish_result(result_id: int, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+async def publish_result(result_id: int, request: Request, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     await result_service.publish_result(db, result_id)
+    await log_event(db, "publish_result", operator=current_user["username"], operator_id=current_user["user_id"],
+                    target=str(result_id), target_type="result", result="success", request=request)
     return {"message": "成绩已发布"}
 
 
 @admin_router.patch("/{result_id}/withdraw")
-async def withdraw_result(result_id: int, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+async def withdraw_result(result_id: int, request: Request, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     await result_service.withdraw_result(db, result_id)
+    await log_event(db, "withdraw_result", operator=current_user["username"], operator_id=current_user["user_id"],
+                    target=str(result_id), target_type="result", result="success", request=request)
     return {"message": "成绩已撤回"}
 
 

@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.middleware.auth import get_current_user
 from app.middleware.contestant_auth import get_optional_contestant
 from app.schemas.registration import RegistrationCreate, RegistrationOut, ExportRequest
 from app.services import registration_service, export_service
+from app.utils.audit import log_event
 
 admin_router = APIRouter(prefix="/api/admin/registrations", tags=["报名管理"])
 public_router = APIRouter(prefix="/api/public/contests", tags=["前台报名"])
@@ -28,13 +29,18 @@ async def list_registrations(
 
 
 @admin_router.get("/{reg_id}", response_model=RegistrationOut)
-async def get_registration(reg_id: int, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    return await registration_service.get_registration(db, reg_id)
+async def get_registration(reg_id: int, request: Request, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    result = await registration_service.get_registration(db, reg_id)
+    await log_event(db, "view_registration", operator=current_user["username"], operator_id=current_user["user_id"],
+                    target=str(reg_id), target_type="registration", result="success", request=request)
+    return result
 
 
 @admin_router.delete("/{reg_id}")
-async def delete_registration(reg_id: int, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+async def delete_registration(reg_id: int, request: Request, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     await registration_service.soft_delete_registration(db, reg_id)
+    await log_event(db, "delete_registration", operator=current_user["username"], operator_id=current_user["user_id"],
+                    target=str(reg_id), target_type="registration", result="success", request=request)
     return {"message": "报名记录已删除，数据将在30天后自动清除"}
 
 
@@ -54,10 +60,14 @@ async def submit_registration(
 # --- Export ---
 
 @export_router.post("")
-async def submit_export(data: ExportRequest, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+async def submit_export(data: ExportRequest, request: Request, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     task_id = await export_service.submit_export_task(
         db, data.export_type, data.contest_id, data.fields, data.group_ids
     )
+    await log_event(db, "export_data", operator=current_user["username"], operator_id=current_user["user_id"],
+                    target=f"contest/{data.contest_id}", target_type="export",
+                    detail={"export_type": data.export_type, "task_id": task_id, "group_ids": data.group_ids},
+                    result="success", request=request)
     return {"task_id": task_id, "message": "导出任务已提交"}
 
 
