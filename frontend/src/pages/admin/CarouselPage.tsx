@@ -175,22 +175,33 @@ export default function CarouselPage() {
 
       {/* Carousel display settings */}
       <Card>
-        <CardContent className="flex items-center gap-4 p-4">
+        <CardContent className="flex items-center gap-2 p-4 flex-wrap">
           <Settings className="h-5 w-5 text-muted-foreground flex-shrink-0" />
           <Label className="flex-shrink-0 text-sm">首页轮播高度</Label>
-          <select
+          <Input
+            type="number"
+            min={200}
+            max={800}
             value={carouselHeight}
-            onChange={e => setCarouselHeight(Number(e.target.value))}
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-          >
-            {HEIGHT_OPTIONS.map(h => (
-              <option key={h} value={h}>{h}px</option>
-            ))}
-          </select>
+            onChange={e => setCarouselHeight(Number(e.target.value) || 400)}
+            className="w-20 h-9 text-sm"
+          />
+          <span className="text-xs text-muted-foreground">px</span>
+          {HEIGHT_OPTIONS.map(h => (
+            <Button
+              key={h}
+              variant={carouselHeight === h ? 'secondary' : 'outline'}
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => setCarouselHeight(h)}
+            >
+              {h}
+            </Button>
+          ))}
           <Button variant="outline" size="sm" onClick={saveHeight} disabled={heightSaving}>
             {heightSaving ? '保存中...' : '应用'}
           </Button>
-          <span className="text-xs text-muted-foreground">所有轮播图统一以此高度显示，宽度自适应</span>
+          <span className="text-xs text-muted-foreground w-full sm:w-auto">所有轮播图统一以此高度显示，宽度自适应</span>
         </CardContent>
       </Card>
 
