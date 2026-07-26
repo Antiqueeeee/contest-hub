@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import secrets
 from jose import jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -72,6 +73,8 @@ async def login_contestant(db: AsyncSession, email: str, password: str) -> dict:
     c = result.scalar_one_or_none()
     if not c:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="邮箱未注册")
+    if c.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="该账号已注销")
     if not verify_password(password, c.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="密码错误")
     return _build_auth_response(c)
@@ -83,9 +86,88 @@ async def login_contestant(db: AsyncSession, email: str, password: str) -> dict:
 async def get_contestant_profile(db: AsyncSession, contestant_id: int) -> Contestant:
     result = await db.execute(select(Contestant).where(Contestant.id == contestant_id))
     c = result.scalar_one_or_none()
-    if not c:
+    if not c or c.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="选手不存在")
     return c
+
+
+async def change_contestant_password(db: AsyncSession, contestant_id: int,
+                                     old_password: str, new_password: str) -> None:
+    """Change a contestant's password after verifying the old one."""
+    c = await get_contestant_profile(db, contestant_id)
+    if not verify_password(old_password, c.password_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="原密码不正确")
+    c.password_hash = hash_password(new_password)
+    await db.commit()
+
+
+async def deactivate_contestant(db: AsyncSession, contestant_id: int, password: str) -> str:
+    """自助注销账号（个保法第 47 条删除权）。
+
+    - 校验密码后执行，防止他人持 token 恶意注销；
+    - 账号 PII 清除且不可恢复：姓名匿名化、身份证号/单位置空、
+      邮箱改写为 deleted_{id}@deleted.invalid（释放原邮箱供再注册）；
+    - 报名记录保留关联（成绩数据不断裂），其中 form_data 的邮箱脱敏；
+    - 历史同意流水（consent_logs）中的邮箱同步脱敏——举证可凭
+      contestant_id + 脱敏邮箱达成，无需保留明文；
+    - 账号报名的身份证号本就不在报名记录中冗余，随账号清除即全部失效。
+    """
+    c = await get_contestant_profile(db, contestant_id)
+    if not verify_password(password, c.password_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="密码不正确")
+
+    # 报名记录去标识化：form_data 中的邮箱脱敏（姓名保留以维持成绩可读）
+    regs = (await db.execute(select(Registration).where(Registration.contestant_id == contestant_id))).scalars().all()
+    for reg in regs:
+        form_data = dict(reg.form_data or {})
+        if form_data.get("email"):
+            form_data["email"] = mask_email(form_data["email"])
+            reg.form_data = form_data
+
+    # 历史同意流水中的明文邮箱脱敏
+    from app.models.consent_log import ConsentLog
+    consent_rows = (await db.execute(
+        select(ConsentLog).where(ConsentLog.contestant_id == contestant_id)
+    )).scalars().all()
+    for row in consent_rows:
+        if row.email and "@" in row.email and not row.email.startswith("deleted_"):
+            row.email = mask_email(row.email)
+
+    original_email = c.email
+    masked_email = mask_email(original_email)
+    c.name = "已注销用户"
+    c.id_number = None
+    c.organization = None
+    c.email = f"deleted_{c.id}@deleted.invalid"
+    c.password_hash = hash_password(secrets.token_urlsafe(32))  # 不可再登录
+    c.deleted_at = datetime.now(timezone.utc)
+    await db.commit()
+    return masked_email  # 供审计日志/撤回记录使用（不留明文）
+
+
+async def get_my_data(db: AsyncSession, contestant_id: int) -> dict:
+    """查阅/复制个人数据（个保法第 45 条）：账号信息 + 报名 + 成绩 + 同意记录。
+
+    身份证号返回脱敏值——明文只在数据库中存在，接口一律不输出。
+    """
+    from app.services.consent_service import get_consent_states
+
+    c = await get_contestant_profile(db, contestant_id)
+    registrations = await get_my_registrations(db, contestant_id)
+    results = await get_my_results(db, contestant_id)
+    consents = await get_consent_states(db, contestant_id)
+    return {
+        "profile": {
+            "email": c.email,
+            "name": c.name,
+            "id_number": mask_id_number(c.id_number) if c.id_number else None,
+            "organization": c.organization,
+            "registered_at": c.created_at.isoformat() if c.created_at else None,
+        },
+        "registrations": registrations,
+        "results": results,
+        "consents": consents,
+    }
 
 
 async def update_contestant_profile(

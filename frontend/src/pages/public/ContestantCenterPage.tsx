@@ -7,7 +7,14 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { ClipboardList, Settings, LogOut, ArrowRight } from 'lucide-react'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { ClipboardList, Settings, LogOut, ArrowRight, ShieldCheck } from 'lucide-react'
+
+function passwordValid(pwd: string) {
+  if (pwd.length < 8 || pwd.length > 64) return false
+  const types = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter(r => r.test(pwd)).length
+  return types >= 2
+}
 
 export default function ContestantCenterPage() {
   const { user, isLoggedIn, logout, updateProfile } = useContestantAuth()
@@ -23,6 +30,19 @@ export default function ContestantCenterPage() {
   const [idNumberMsg, setIdNumberMsg] = useState('')
   const [savingIdNumber, setSavingIdNumber] = useState(false)
   const [activeTab, setActiveTab] = useState('records')
+  const [consents, setConsents] = useState<any[]>([])
+  const [oldPassword, setOldPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [pwdMsg, setPwdMsg] = useState('')
+  const [savingPwd, setSavingPwd] = useState(false)
+  const [withdrawOpen, setWithdrawOpen] = useState(false)
+  const [withdrawing, setWithdrawing] = useState(false)
+  const [consentMsg, setConsentMsg] = useState('')
+  const [exporting, setExporting] = useState(false)
+  const [deactivatePassword, setDeactivatePassword] = useState('')
+  const [deactivateMsg, setDeactivateMsg] = useState('')
+  const [deactivating, setDeactivating] = useState(false)
 
   useEffect(() => {
     if (!isLoggedIn) { navigate('/login'); return }
@@ -36,6 +56,9 @@ export default function ContestantCenterPage() {
     ca.get<any>('/contestant/registrations').then(r => {
       setRecords(r.items || [])
     }).catch(console.error).finally(() => setDataLoading(false))
+    ca.get<any>('/contestant/consents').then(c => {
+      setConsents(c.items || [])
+    }).catch(() => {})
   }, [isLoggedIn, navigate, user])
 
   const handleSaveProfile = async () => {
@@ -58,6 +81,73 @@ export default function ContestantCenterPage() {
     } catch (e) {
       setIdNumberMsg(e instanceof Error ? e.message : '保存失败')
     } finally { setSavingIdNumber(false) }
+  }
+
+  const handleChangePassword = async () => {
+    setPwdMsg('')
+    if (!oldPassword) { setPwdMsg('请输入原密码'); return }
+    if (!passwordValid(newPassword)) { setPwdMsg('新密码需8-64位，且包含大写字母/小写字母/数字/符号中至少两种'); return }
+    if (newPassword !== confirmPassword) { setPwdMsg('两次输入的新密码不一致'); return }
+    setSavingPwd(true)
+    try {
+      await contestantApi().post('/contestant/password', { old_password: oldPassword, new_password: newPassword })
+      setOldPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      setPwdMsg('密码修改成功')
+    } catch (e) {
+      setPwdMsg(e instanceof Error ? e.message : '修改失败')
+    } finally { setSavingPwd(false) }
+  }
+
+  const handleWithdrawIdNumber = async () => {
+    setConsentMsg('')
+    setWithdrawing(true)
+    try {
+      await contestantApi().post('/contestant/consents/id_number/withdraw')
+      setWithdrawOpen(false)
+      setConsentMsg('撤回成功：已删除绑定的身份证号，下次报名时需重新填写并单独同意')
+      const ca = contestantApi()
+      const [c, p] = await Promise.all([
+        ca.get<any>('/contestant/consents'),
+        ca.get<any>('/contestant/profile'),
+      ])
+      setConsents(c.items || [])
+      setIdNumber(p.id_number || null)
+    } catch (e) {
+      setConsentMsg(e instanceof Error ? e.message : '撤回失败')
+    } finally { setWithdrawing(false) }
+  }
+
+  const handleExportData = async () => {
+    setExporting(true)
+    try {
+      const data = await contestantApi().get<any>('/contestant/my-data')
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `我的数据_${new Date().toISOString().split('T')[0]}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '导出失败')
+    } finally { setExporting(false) }
+  }
+
+  const handleDeactivate = async () => {
+    setDeactivateMsg('')
+    if (!deactivatePassword) { setDeactivateMsg('请输入密码以确认注销'); return }
+    if (!window.confirm('注销后账号不可恢复，确定要继续吗？')) return
+    setDeactivating(true)
+    try {
+      await contestantApi().post('/contestant/deactivate', { password: deactivatePassword })
+      logout()
+      navigate('/')
+    } catch (e) {
+      setDeactivateMsg(e instanceof Error ? e.message : '注销失败')
+      setDeactivating(false)
+    }
   }
 
   if (dataLoading) return <div className="text-center py-20 text-muted-foreground">加载中...</div>
@@ -91,6 +181,7 @@ export default function ContestantCenterPage() {
           {[
             { id: 'records', icon: ClipboardList, label: '参赛记录' },
             { id: 'profile', icon: Settings, label: '账号设置' },
+            { id: 'security', icon: ShieldCheck, label: '隐私与安全' },
           ].map(item => (
             <button key={item.id} onClick={() => setActiveTab(item.id)}
               className={`w-full flex items-center gap-2.5 px-4 py-2.5 rounded-lg text-sm transition-colors text-left ${
@@ -187,8 +278,85 @@ export default function ContestantCenterPage() {
               </Card>
             </div>
           )}
+
+          {activeTab === 'security' && (
+            <div className="space-y-4">
+              <h2 className="text-lg font-bold">隐私与安全</h2>
+              <Card className="border-0 shadow-sm max-w-md">
+                <CardContent className="space-y-4 pt-6">
+                  <div className="space-y-1.5">
+                    <Label>修改密码</Label>
+                    <p className="text-xs text-muted-foreground">新密码需8-64位，且包含大写字母/小写字母/数字/符号中至少两种</p>
+                  </div>
+                  <div className="space-y-1.5"><Label>原密码</Label><Input type="password" value={oldPassword} onChange={e => { setOldPassword(e.target.value); setPwdMsg('') }} placeholder="请输入原密码" /></div>
+                  <div className="space-y-1.5"><Label>新密码</Label><Input type="password" value={newPassword} onChange={e => { setNewPassword(e.target.value); setPwdMsg('') }} placeholder="8-64位，含字母/数字/符号中至少两种" /></div>
+                  <div className="space-y-1.5"><Label>确认新密码</Label><Input type="password" value={confirmPassword} onChange={e => { setConfirmPassword(e.target.value); setPwdMsg('') }} placeholder="再次输入新密码" /></div>
+                  {pwdMsg && <p className={`text-sm ${pwdMsg.includes('成功') ? 'text-green-600' : 'text-destructive'}`}>{pwdMsg}</p>}
+                  <Button onClick={handleChangePassword} disabled={savingPwd || !oldPassword || !newPassword} className="w-full">{savingPwd ? '提交中...' : '修改密码'}</Button>
+                </CardContent>
+              </Card>
+              <Card className="border-0 shadow-sm max-w-md">
+                <CardContent className="space-y-4 pt-6">
+                  <div className="space-y-1.5">
+                    <Label>授权管理</Label>
+                    <p className="text-xs text-muted-foreground">管理你对平台收集和使用个人信息的授权</p>
+                  </div>
+                  {consents.map(c => (
+                    <div key={c.consent_type} className="flex items-start justify-between gap-3 text-sm border-t pt-3 first:border-0 first:pt-0">
+                      <div>
+                        <p className="font-medium">{c.consent_type === 'privacy' ? '隐私政策' : '身份证号收集'}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {c.granted ? '已同意' : '未同意'}
+                          {c.updated_at && ` · ${c.updated_at.split('T')[0]}`}
+                          {c.policy_version && ` · 版本 ${c.policy_version}`}
+                        </p>
+                        {c.consent_type === 'privacy' && (
+                          <p className="text-xs text-muted-foreground mt-1">隐私政策同意是使用平台服务的基础，如需撤回请注销账号</p>
+                        )}
+                      </div>
+                      {c.consent_type === 'id_number' && c.granted && (
+                        <Button variant="outline" size="sm" onClick={() => { setConsentMsg(''); setWithdrawOpen(true) }}>撤回</Button>
+                      )}
+                    </div>
+                  ))}
+                  {consentMsg && <p className={`text-sm ${consentMsg.includes('成功') ? 'text-green-600' : 'text-destructive'}`}>{consentMsg}</p>}
+                </CardContent>
+              </Card>
+              <Card className="border-0 shadow-sm max-w-md">
+                <CardContent className="space-y-4 pt-6">
+                  <div className="space-y-1.5">
+                    <Label>导出我的数据</Label>
+                    <p className="text-xs text-muted-foreground">下载你的账号资料、报名记录、成绩和授权记录的 JSON 副本</p>
+                  </div>
+                  <Button variant="outline" onClick={handleExportData} disabled={exporting} className="w-full">{exporting ? '导出中...' : '导出 JSON 文件'}</Button>
+                </CardContent>
+              </Card>
+              <Card className="border border-destructive/50 shadow-sm max-w-md">
+                <CardContent className="space-y-4 pt-6">
+                  <div className="space-y-1.5">
+                    <Label className="text-destructive">注销账号</Label>
+                    <p className="text-xs text-muted-foreground">注销后账号不可恢复：姓名、身份证号、邮箱将被清除或匿名化，报名与成绩记录将匿名保留</p>
+                  </div>
+                  <div className="space-y-1.5"><Label>登录密码</Label><Input type="password" value={deactivatePassword} onChange={e => { setDeactivatePassword(e.target.value); setDeactivateMsg('') }} placeholder="输入密码以确认注销" /></div>
+                  {deactivateMsg && <p className="text-sm text-destructive">{deactivateMsg}</p>}
+                  <Button variant="destructive" onClick={handleDeactivate} disabled={deactivating || !deactivatePassword} className="w-full">{deactivating ? '注销中...' : '确认注销账号'}</Button>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </div>
       </div>
+
+      <Dialog open={withdrawOpen} onOpenChange={setWithdrawOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>撤回身份证号收集同意</DialogTitle></DialogHeader>
+          <DialogDescription>撤回后，账号上绑定的身份证号将被删除，下次报名时需重新填写并单独同意。确定要撤回吗？</DialogDescription>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWithdrawOpen(false)}>取消</Button>
+            <Button variant="destructive" onClick={handleWithdrawIdNumber} disabled={withdrawing}>{withdrawing ? '撤回中...' : '确认撤回'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

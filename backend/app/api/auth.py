@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.middleware.auth import get_current_user
-from app.schemas.user import LoginRequest, TokenResponse, UserCreate, UserUpdate, UserOut
+from app.schemas.user import LoginRequest, TokenResponse, UserCreate, UserUpdate, UserOut, PasswordChange
 from app.services import auth_service
 from app.services.login_guard import check_login_allowed
 from app.utils.audit import log_event
@@ -29,6 +29,18 @@ async def login(req: LoginRequest, request: Request, db: AsyncSession = Depends(
 @router.post("/logout")
 async def logout(request: Request):
     return {"message": "已退出登录"}
+
+
+@router.post("/password",
+             dependencies=[Depends(rate_limit("admin_password", max_requests=5, window_seconds=60))])
+async def change_password(data: PasswordChange, request: Request,
+                          db: AsyncSession = Depends(get_db),
+                          current_user: dict = Depends(get_current_user)):
+    """管理员修改自己的密码（需验证原密码）。"""
+    await auth_service.change_admin_password(db, current_user["user_id"], data.old_password, data.new_password)
+    await log_event(db, "admin_change_password", operator=current_user["username"],
+                    operator_id=current_user["user_id"], result="success", request=request)
+    return {"message": "密码已更新"}
 
 
 @admin_router.get("", response_model=dict)

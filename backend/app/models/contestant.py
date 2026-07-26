@@ -16,4 +16,6 @@ class Contestant(Base):
     # (最小必要原则), then bound to the account and reused.
     id_number: Mapped[str | None] = mapped_column(EncryptedString(512), nullable=True)
     organization: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # 自助注销：标记注销时间并清除账号 PII，报名记录保留关联（匿名化）。
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

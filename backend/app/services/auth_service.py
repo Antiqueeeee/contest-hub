@@ -84,6 +84,19 @@ async def update_user(db: AsyncSession, user_id: int, data: UserUpdate) -> User:
     return user
 
 
+async def change_admin_password(db: AsyncSession, user_id: int,
+                                old_password: str, new_password: str) -> None:
+    """Change an admin's own password after verifying the old one."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
+    if not verify_password(old_password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="原密码不正确")
+    user.password_hash = hash_password(new_password)
+    await db.commit()
+
+
 async def toggle_user_status(db: AsyncSession, user_id: int, current_user_id: int) -> User:
     if user_id == current_user_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不能操作自己的账号")

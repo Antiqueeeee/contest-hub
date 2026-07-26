@@ -43,3 +43,8 @@ class ContestantProfileUpdate(BaseModel):
     _id_number_valid = field_validator("id_number")(
         lambda v: validate_id_number(v) if v is not None else v
     )
+
+
+class DeactivateRequest(BaseModel):
+    """注销账号：需密码确认，防止他人持 token 恶意注销。"""
+    password: str

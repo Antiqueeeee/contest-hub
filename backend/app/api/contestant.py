@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.middleware.contestant_auth import get_current_contestant
-from app.schemas.contestant import ContestantRegister, ContestantLogin, ContestantProfileUpdate
-from app.services import contestant_service
+from app.schemas.contestant import ContestantRegister, ContestantLogin, ContestantProfileUpdate, DeactivateRequest
+from app.schemas.user import PasswordChange
+from app.services import contestant_service, consent_service
 from app.services.login_guard import check_login_allowed
 from app.utils.crypto import mask_id_number
 from app.utils.audit import log_event
@@ -16,6 +17,11 @@ router = APIRouter(prefix="/api", tags=["选手"])
              dependencies=[Depends(rate_limit("contestant_register", max_requests=10, window_seconds=60))])
 async def register(data: ContestantRegister, request: Request, db: AsyncSession = Depends(get_db)):
     result = await contestant_service.register_contestant(db, data)
+    await consent_service.record_consent(
+        db, consent_type="privacy", action="granted",
+        contestant_id=result["user"]["id"], email=data.email, request=request,
+    )
+    await db.commit()
     await log_event(db, "contestant_register", operator=data.email, operator_id=result["user"]["id"],
                     result="success", request=request)
     return result
@@ -106,3 +112,64 @@ async def my_contest_result(contest_id: int, current: dict = Depends(get_current
         "rank": result.rank,
         "award_name": award_name,
     }
+
+
+@router.post("/contestant/password",
+             dependencies=[Depends(rate_limit("contestant_password", max_requests=5, window_seconds=60))])
+async def change_password(data: PasswordChange, request: Request,
+                          current: dict = Depends(get_current_contestant),
+                          db: AsyncSession = Depends(get_db)):
+    await contestant_service.change_contestant_password(
+        db, current["contestant_id"], data.old_password, data.new_password)
+    await log_event(db, "contestant_change_password", operator=str(current["contestant_id"]),
+                    operator_id=current["contestant_id"], result="success", request=request)
+    return {"message": "密码已更新"}
+
+
+@router.get("/contestant/my-data")
+async def my_data(request: Request, current: dict = Depends(get_current_contestant),
+                  db: AsyncSession = Depends(get_db)):
+    """查阅/复制个人数据（个保法第 45 条）。身份证号仅返回脱敏值。"""
+    data = await contestant_service.get_my_data(db, current["contestant_id"])
+    await log_event(db, "contestant_view_my_data", operator=str(current["contestant_id"]),
+                    operator_id=current["contestant_id"], result="success", request=request)
+    return data
+
+
+@router.get("/contestant/consents")
+async def my_consents(current: dict = Depends(get_current_contestant),
+                      db: AsyncSession = Depends(get_db)):
+    items = await consent_service.get_consent_states(db, current["contestant_id"])
+    return {"items": items}
+
+
+@router.post("/contestant/consents/{consent_type}/withdraw")
+async def withdraw_consent(consent_type: str, request: Request,
+                           current: dict = Depends(get_current_contestant),
+                           db: AsyncSession = Depends(get_db)):
+    await consent_service.withdraw_consent(db, current["contestant_id"], consent_type, request)
+    await db.commit()
+    await log_event(db, "contestant_withdraw_consent", operator=str(current["contestant_id"]),
+                    operator_id=current["contestant_id"], target=consent_type,
+                    target_type="consent", result="success", request=request)
+    return {"message": "已撤回同意"}
+
+
+@router.post("/contestant/deactivate",
+             dependencies=[Depends(rate_limit("contestant_deactivate", max_requests=5, window_seconds=60))])
+async def deactivate(data: DeactivateRequest, request: Request,
+                     current: dict = Depends(get_current_contestant),
+                     db: AsyncSession = Depends(get_db)):
+    """自助注销账号（个保法第 47 条）。注销后 token 立即失效（middleware 查 deleted_at）。"""
+    cid = current["contestant_id"]
+    masked_email = await contestant_service.deactivate_contestant(db, cid, data.password)
+    # 注销视为同时撤回全部同意（邮箱脱敏记录，不留明文）
+    for ctype in consent_service.CONSENT_TYPES:
+        await consent_service.record_consent(
+            db, consent_type=ctype, action="withdrawn",
+            contestant_id=cid, email=masked_email, request=request,
+        )
+    await db.commit()
+    await log_event(db, "contestant_deactivate", operator=masked_email, operator_id=cid,
+                    result="success", request=request)
+    return {"message": "账号已注销，相关个人信息已清除"}

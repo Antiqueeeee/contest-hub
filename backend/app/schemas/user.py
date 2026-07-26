@@ -29,6 +29,14 @@ class UserUpdate(BaseModel):
     phone: str | None = Field(None, max_length=20)
 
 
+class PasswordChange(BaseModel):
+    """修改自己的密码（管理员与选手共用）。"""
+    old_password: str
+    new_password: str = Field(min_length=8, max_length=64)
+
+    _new_password_strength = field_validator("new_password")(validate_password_strength)
+
+
 class UserOut(BaseModel):
     id: int
     username: str

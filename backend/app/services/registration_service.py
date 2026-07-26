@@ -18,7 +18,8 @@ def _gen_registration_number(contest_id: int, seq: int) -> str:
     return f"C{contest_id:03d}-{date_str}-{seq:04d}"
 
 
-async def register(db: AsyncSession, data: RegistrationCreate, contestant_id: int | None = None) -> Registration:
+async def register(db: AsyncSession, data: RegistrationCreate, contestant_id: int | None = None,
+                   request=None) -> Registration:
     # ── Resolve id_number ──────────────────────────────────────────
     # 账号已绑定身份证：直接使用账号值，不在报名记录中冗余存储。
     # 账号未绑定 / 匿名报名：使用表单提交的值（要求敏感信息单独同意）；
@@ -27,6 +28,9 @@ async def register(db: AsyncSession, data: RegistrationCreate, contestant_id: in
     if contestant_id is not None:
         c_result = await db.execute(select(Contestant).where(Contestant.id == contestant_id))
         contestant_row = c_result.scalar_one_or_none()
+        if contestant_row is not None and contestant_row.deleted_at is not None:
+            # 防御：已注销账号不得以账号身份报名（middleware 已拦截，此处兜底）
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="账号已注销")
 
     if contestant_row is not None and contestant_row.id_number:
         id_number = contestant_row.id_number  # EncryptedString auto-decrypts
@@ -120,12 +124,8 @@ async def register(db: AsyncSession, data: RegistrationCreate, contestant_id: in
         if stored_plain and stored_plain == id_number:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该身份证号已在此赛事此组别报名")
 
-    # Generate registration number
-    count_r = await db.execute(select(func.count(Registration.id)).where(Registration.contest_id == data.contest_id))
-    seq = (count_r.scalar() or 0) + 1
-
-    # Build form_data — 匿名报名无账号可绑定，身份证号加密存于报名记录；
-    # 账号报名的身份证号只存在选手账号上，不冗余。
+    # Generate registration number + insert, retrying on registration_number
+    # collision (并发下同号) — 唯一索引兜底，重算序号最多 3 次
     form_data = {
         "name": data.name,
         "email": data.email,
@@ -137,21 +137,38 @@ async def register(db: AsyncSession, data: RegistrationCreate, contestant_id: in
     # Custom fields are stored as-is (caller is responsible for not putting PII in them)
     form_data.update(data.custom_fields)
 
-    reg = Registration(
-        contest_id=data.contest_id,
-        contestant_id=contestant_id,
-        group_id=data.group_id,
-        registration_number=_gen_registration_number(data.contest_id, seq),
-        form_data=form_data,
-    )
-    db.add(reg)
-    try:
-        await db.commit()
-    except IntegrityError:
-        # 兜底并发竞态：唯一索引 ux_registrations_contest_group_contestant
-        # 拦截同账号同赛事同组别的重复提交（含双击/重试）
-        await db.rollback()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="您已提交过报名，请勿重复提交")
+    reg = None
+    for _attempt in range(3):
+        count_r = await db.execute(select(func.count(Registration.id)).where(Registration.contest_id == data.contest_id))
+        seq = (count_r.scalar() or 0) + 1
+        reg = Registration(
+            contest_id=data.contest_id,
+            contestant_id=contestant_id,
+            group_id=data.group_id,
+            registration_number=_gen_registration_number(data.contest_id, seq),
+            form_data=form_data,
+        )
+        db.add(reg)
+        try:
+            await db.commit()
+            break
+        except IntegrityError as e:
+            await db.rollback()
+            if "ux_registrations_contest_group_contestant" in str(e.orig):
+                # 同账号同赛事同组别重复提交（含双击/重试）
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="您已提交过报名，请勿重复提交")
+    else:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="报名提交失败，请重试")
+
+    # 同意记录持久化（个保法举证）：隐私政策 + （如提交了身份证号）敏感信息单独同意
+    from app.services.consent_service import record_consent
+    await record_consent(db, consent_type="privacy", action="granted",
+                         contestant_id=contestant_id, email=data.email, request=request)
+    if data.id_number and data.id_number_agreed:
+        await record_consent(db, consent_type="id_number", action="granted",
+                             contestant_id=contestant_id, email=data.email, request=request)
+    await db.commit()
+
     await db.refresh(reg)
     return reg
 
