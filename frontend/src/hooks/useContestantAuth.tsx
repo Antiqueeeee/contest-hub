@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 import { api, BASE_URL } from '@/api/client'
 
-interface Contestant { id: number; name: string; email: string; id_number: string; organization: string | null }
+interface Contestant { id: number; name: string; email: string; id_number: string | null; organization: string | null }
 
 const TOKEN_KEY = 'contest_hub_contestant_token'
 const USER_KEY = 'contest_hub_contestant_user'
@@ -46,7 +46,7 @@ export function contestantApi() {
 interface AuthCtx {
   user: Contestant | null
   login: (email: string, password: string) => Promise<void>
-  register: (email: string, password: string, name: string, idNumber: string, organization: string) => Promise<void>
+  register: (email: string, password: string, name: string, organization: string, privacyAgreed: boolean) => Promise<void>
   logout: () => void
   updateProfile: (name: string, email: string, organization: string) => Promise<void>
   isLoggedIn: boolean
@@ -71,8 +71,8 @@ export function ContestantAuthProvider({ children }: { children: ReactNode }) {
     sessionStorage.setItem(USER_KEY, JSON.stringify(res.user))
   }, [])
 
-  const register = useCallback(async (email: string, password: string, name: string, idNumber: string, organization: string) => {
-    const res = await api.post<{ access_token: string; user: Contestant }>('/auth/contestant/register', { email, password, name, id_number: idNumber, organization: organization || null })
+  const register = useCallback(async (email: string, password: string, name: string, organization: string, privacyAgreed: boolean) => {
+    const res = await api.post<{ access_token: string; user: Contestant }>('/auth/contestant/register', { email, password, name, organization: organization || null, privacy_agreed: privacyAgreed })
     setCToken(res.access_token)
     setUser(res.user)
     sessionStorage.setItem(USER_KEY, JSON.stringify(res.user))

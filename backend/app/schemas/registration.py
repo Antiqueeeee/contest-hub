@@ -1,6 +1,7 @@
 from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
 from app.utils.crypto import decrypt_value, mask_id_number
+from app.utils.validators import validate_id_number
 
 
 class RegistrationCreate(BaseModel):
@@ -8,12 +9,28 @@ class RegistrationCreate(BaseModel):
     group_id: int | None = None
     name: str = Field(min_length=2, max_length=20)
     email: str = Field(max_length=255)
-    # Optional for logged-in users (backend fetches from account).
-    # Required for anonymous public registration.
+    # Optional for logged-in users whose account already has an id_number bound
+    # (backend uses the account value).  Required for anonymous registration
+    # and for first-time registration from a logged-in account without one.
     id_number: str | None = Field(default=None, min_length=18, max_length=18)
     organization: str | None = Field(default=None, max_length=200)
     custom_fields: dict[str, str] = {}
-    privacy_agreed: bool = True
+    # 明示同意：必填且必须为 true，前端默认不勾选、由用户主动勾选。
+    privacy_agreed: bool
+    # 敏感个人信息（身份证号）单独同意，仅在实际提交身份证号时要求。
+    id_number_agreed: bool = False
+
+    @field_validator("id_number")
+    @classmethod
+    def id_number_checksum(cls, v: str | None) -> str | None:
+        return validate_id_number(v) if v is not None else v
+
+    @field_validator("privacy_agreed")
+    @classmethod
+    def must_agree_privacy(cls, v: bool) -> bool:
+        if not v:
+            raise ValueError("请先阅读并同意《隐私政策》")
+        return v
 
 
 class RegistrationOut(BaseModel):

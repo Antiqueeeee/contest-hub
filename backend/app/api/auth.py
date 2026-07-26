@@ -4,14 +4,18 @@ from app.database import get_db
 from app.middleware.auth import get_current_user
 from app.schemas.user import LoginRequest, TokenResponse, UserCreate, UserUpdate, UserOut
 from app.services import auth_service
+from app.services.login_guard import check_login_allowed
 from app.utils.audit import log_event
+from app.utils.rate_limit import rate_limit
 
 router = APIRouter(prefix="/api/auth", tags=["认证"])
 admin_router = APIRouter(prefix="/api/admin/users", tags=["管理员管理"])
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=TokenResponse,
+             dependencies=[Depends(rate_limit("admin_login", max_requests=10, window_seconds=60))])
 async def login(req: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    await check_login_allowed(db, operator=req.username, request=request)
     try:
         result = await auth_service.authenticate(db, req)
         await log_event(db, "login_success", operator=req.username, operator_id=result["user"]["id"],

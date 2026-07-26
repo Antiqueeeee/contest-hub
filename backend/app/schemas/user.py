@@ -1,6 +1,7 @@
 from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
 from app.utils.crypto import mask_phone
+from app.utils.validators import validate_password_strength
 
 
 class LoginRequest(BaseModel):
@@ -16,9 +17,11 @@ class TokenResponse(BaseModel):
 
 class UserCreate(BaseModel):
     username: str = Field(min_length=2, max_length=50)
-    password: str = Field(min_length=6, max_length=20)
+    password: str = Field(min_length=8, max_length=64)
     name: str = Field(min_length=1, max_length=50)
     phone: str = Field(default="", max_length=20)
+
+    _password_strength = field_validator("password")(validate_password_strength)
 
 
 class UserUpdate(BaseModel):

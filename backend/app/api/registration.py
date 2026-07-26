@@ -6,6 +6,7 @@ from app.middleware.contestant_auth import get_optional_contestant
 from app.schemas.registration import RegistrationCreate, RegistrationOut, ExportRequest
 from app.services import registration_service, export_service
 from app.utils.audit import log_event
+from app.utils.rate_limit import rate_limit
 
 admin_router = APIRouter(prefix="/api/admin/registrations", tags=["报名管理"])
 public_router = APIRouter(prefix="/api/public/contests", tags=["前台报名"])
@@ -25,15 +26,16 @@ async def list_registrations(
     current_user: dict = Depends(get_current_user),
 ):
     items, total = await registration_service.list_registrations(db, contest_id, group_id, keyword, page, page_size)
-    return {"items": [RegistrationOut.model_validate(r).model_dump() for r in items], "total": total, "page": page, "page_size": page_size}
+    serialized = await registration_service.serialize_registrations(db, items)
+    return {"items": serialized, "total": total, "page": page, "page_size": page_size}
 
 
-@admin_router.get("/{reg_id}", response_model=RegistrationOut)
+@admin_router.get("/{reg_id}", response_model=dict)
 async def get_registration(reg_id: int, request: Request, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     result = await registration_service.get_registration(db, reg_id)
     await log_event(db, "view_registration", operator=current_user["username"], operator_id=current_user["user_id"],
                     target=str(reg_id), target_type="registration", result="success", request=request)
-    return result
+    return await registration_service.serialize_registration(db, result)
 
 
 @admin_router.delete("/{reg_id}")
@@ -46,7 +48,8 @@ async def delete_registration(reg_id: int, request: Request, db: AsyncSession = 
 
 # --- Public ---
 
-@public_router.post("/{contest_id}/register", response_model=RegistrationOut, status_code=201)
+@public_router.post("/{contest_id}/register", response_model=RegistrationOut, status_code=201,
+                    dependencies=[Depends(rate_limit("public_register", max_requests=20, window_seconds=60))])
 async def submit_registration(
     contest_id: int,
     data: RegistrationCreate,
@@ -59,7 +62,8 @@ async def submit_registration(
 
 # --- Export ---
 
-@export_router.post("")
+@export_router.post("",
+                    dependencies=[Depends(rate_limit("export", max_requests=10, window_seconds=60))])
 async def submit_export(data: ExportRequest, request: Request, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     task_id = await export_service.submit_export_task(
         db, data.export_type, data.contest_id, data.fields, data.group_ids

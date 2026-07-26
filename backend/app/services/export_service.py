@@ -68,10 +68,26 @@ def _write_header_row(ws: Worksheet, field_names: list[str]) -> None:
         cell.border = thin_border
 
 
+async def _fetch_contestant_id_map(db: AsyncSession, contestant_ids: set[int]) -> dict[int, str]:
+    """Return {contestant_id: plaintext id_number} for account-bound registrations.
+
+    账号绑定的报名不在 form_data 冗余存身份证号，导出时从选手账号解析。
+    """
+    if not contestant_ids:
+        return {}
+    from sqlalchemy import select
+    from app.models.contestant import Contestant
+    result = await db.execute(
+        select(Contestant.id, Contestant.id_number).where(Contestant.id.in_(contestant_ids))
+    )
+    return {cid: id_number for cid, id_number in result.all() if id_number}
+
+
 def _write_registration_rows(
-    ws: Worksheet, rows: list, field_names: list[str]
+    ws: Worksheet, rows: list, field_names: list[str], id_map: dict[int, str] | None = None,
 ) -> None:
     """Fill registration data rows into the worksheet starting at row 2."""
+    id_map = id_map or {}
     for row_idx, reg in enumerate(rows, 2):
         form_data = reg.form_data or {}
         for col_idx, name in enumerate(field_names, 1):
@@ -82,7 +98,7 @@ def _write_registration_rows(
             elif name == "email":
                 val = form_data.get("email", "")
             elif name == "id_number":
-                val = decrypt_value(form_data.get("id_number", ""))
+                val = decrypt_value(form_data.get("id_number", "")) or id_map.get(reg.contestant_id, "")
             elif name == "organization":
                 val = form_data.get("organization", "")
             elif name == "group_id":
@@ -97,13 +113,16 @@ def _write_registration_rows(
 
 
 async def _write_result_rows(
-    ws: Worksheet, items: list, db: AsyncSession, field_names: list[str]
+    ws: Worksheet, items: list, db: AsyncSession, field_names: list[str],
+    id_map: dict[int, str] | None = None,
 ) -> None:
     """Fill result data rows, looking up per-row registration info for name/email fields."""
     from app.services.registration_service import get_registration
 
+    id_map = id_map or {}
     for row_idx, r in enumerate(items, 2):
         # Best-effort registration lookup: missing registration shouldn't block the whole export
+        reg = None
         try:
             reg = await get_registration(db, r.registration_id)
             form_data = reg.form_data or {}
@@ -121,6 +140,8 @@ async def _write_result_rows(
                 val = form_data.get("email", "")
             elif name == "id_number":
                 val = decrypt_value(form_data.get("id_number", ""))
+                if not val and reg is not None:
+                    val = id_map.get(reg.contestant_id, "")
             elif name == "organization":
                 val = form_data.get("organization", "")
             elif name == "total_score":
@@ -195,10 +216,19 @@ async def submit_export_task(
 
         if export_type == "registration":
             rows = await get_registrations_for_export(db, contest_id, group_ids)
-            _write_registration_rows(ws, rows, field_names)
+            id_map = await _fetch_contestant_id_map(db, {r.contestant_id for r in rows if r.contestant_id})
+            _write_registration_rows(ws, rows, field_names, id_map)
         else:
             items, _ = await list_results(db, ResultFilter(contest_id=contest_id, page=1, page_size=settings.export_max_rows))
-            await _write_result_rows(ws, items, db, field_names)
+            from app.models.registration import Registration
+            from sqlalchemy import select as reg_select
+            reg_rows = await db.execute(
+                reg_select(Registration.contestant_id).where(
+                    Registration.id.in_([r.registration_id for r in items])
+                )
+            )
+            id_map = await _fetch_contestant_id_map(db, {cid for (cid,) in reg_rows.all() if cid})
+            await _write_result_rows(ws, items, db, field_names, id_map)
 
         _auto_fit_columns(ws)
 

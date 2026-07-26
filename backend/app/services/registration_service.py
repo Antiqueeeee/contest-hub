@@ -1,13 +1,15 @@
 from datetime import datetime, timezone
 from sqlalchemy import select, func, and_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 
 from app.models.contest import Contest, ContestGroup, ContestStatus
+from app.models.contestant import Contestant
 from app.models.registration import Registration
-from app.schemas.registration import RegistrationCreate
+from app.schemas.registration import RegistrationCreate, RegistrationOut
 from app.utils.timezone import to_aware
-from app.utils.crypto import encrypt_value, decrypt_value
+from app.utils.crypto import encrypt_value, decrypt_value, mask_id_number
 
 
 def _gen_registration_number(contest_id: int, seq: int) -> str:
@@ -18,21 +20,26 @@ def _gen_registration_number(contest_id: int, seq: int) -> str:
 
 async def register(db: AsyncSession, data: RegistrationCreate, contestant_id: int | None = None) -> Registration:
     # ── Resolve id_number ──────────────────────────────────────────
-    # Logged-in users: fetch from account (full id_number never leaves backend).
-    # Anonymous users: use the value they submitted in the form.
-    from app.models.contestant import Contestant
-
-    id_number = data.id_number
+    # 账号已绑定身份证：直接使用账号值，不在报名记录中冗余存储。
+    # 账号未绑定 / 匿名报名：使用表单提交的值（要求敏感信息单独同意）；
+    # 登录用户提交后顺带绑定到账号，供后续赛事复用。
+    contestant_row = None
     if contestant_id is not None:
         c_result = await db.execute(select(Contestant).where(Contestant.id == contestant_id))
         contestant_row = c_result.scalar_one_or_none()
-        if contestant_row:
-            id_number = contestant_row.id_number  # EncryptedString auto-decrypts
-        elif not id_number:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="请提供身份证号")
 
-    if not id_number:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="请提供身份证号")
+    if contestant_row is not None and contestant_row.id_number:
+        id_number = contestant_row.id_number  # EncryptedString auto-decrypts
+    else:
+        if not data.id_number:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="请填写身份证号")
+        if not data.id_number_agreed:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="身份证号属于敏感个人信息，请勾选单独同意后再提交")
+        id_number = data.id_number
+        if contestant_row is not None:
+            # 首次报名时绑定到账号（最小必要：注册阶段不收集）
+            contestant_row.id_number = data.id_number
 
     # Validate contest is open
     result = await db.execute(select(Contest).where(Contest.id == data.contest_id))
@@ -69,8 +76,23 @@ async def register(db: AsyncSession, data: RegistrationCreate, contestant_id: in
         if group.max_participants > 0 and count_result.scalar() >= group.max_participants:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该组别名额已满")
 
-    # Check duplicate id_number — fetch existing registrations and compare decrypted values
-    existing_regs = await db.execute(
+    # Check duplicate — same account already registered, or same id_number
+    # among anonymous submissions (account-bound regs carry no form_data copy).
+    if contestant_id is not None:
+        dup_result = await db.execute(
+            select(func.count(Registration.id)).where(
+                and_(
+                    Registration.contest_id == data.contest_id,
+                    Registration.group_id == data.group_id,
+                    Registration.contestant_id == contestant_id,
+                    Registration.deleted_at.is_(None),
+                )
+            )
+        )
+        if (dup_result.scalar() or 0) > 0:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="您已在此赛事此组别报名")
+
+    existing_regs = list((await db.execute(
         select(Registration).where(
             and_(
                 Registration.contest_id == data.contest_id,
@@ -78,22 +100,38 @@ async def register(db: AsyncSession, data: RegistrationCreate, contestant_id: in
                 Registration.deleted_at.is_(None),
             )
         )
-    )
-    for reg in existing_regs.scalars().all():
-        stored_encrypted = reg.form_data.get("id_number", "")
-        if stored_encrypted and decrypt_value(stored_encrypted) == id_number:
+    )).scalars().all())
+
+    # 跨账号同证号比对：匿名报名比 form_data 密文（解密），账号报名比账号上的证号。
+    # 批量取账号避免逐条查询；身份证号不做真实核验，此比对为尽力去重。
+    bound_cids = {r.contestant_id for r in existing_regs if r.contestant_id}
+    bound_ids: dict[int, str] = {}
+    if bound_cids:
+        c_rows = await db.execute(
+            select(Contestant.id, Contestant.id_number).where(Contestant.id.in_(bound_cids))
+        )
+        bound_ids = {cid: idn for cid, idn in c_rows.all() if idn}
+
+    for reg in existing_regs:
+        stored_plain = bound_ids.get(reg.contestant_id) if reg.contestant_id else None
+        if stored_plain is None:
+            stored_encrypted = reg.form_data.get("id_number", "")
+            stored_plain = decrypt_value(stored_encrypted) if stored_encrypted else ""
+        if stored_plain and stored_plain == id_number:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该身份证号已在此赛事此组别报名")
 
     # Generate registration number
     count_r = await db.execute(select(func.count(Registration.id)).where(Registration.contest_id == data.contest_id))
     seq = (count_r.scalar() or 0) + 1
 
-    # Build form_data — encrypt id_number before storing
+    # Build form_data — 匿名报名无账号可绑定，身份证号加密存于报名记录；
+    # 账号报名的身份证号只存在选手账号上，不冗余。
     form_data = {
         "name": data.name,
         "email": data.email,
-        "id_number": encrypt_value(id_number),
     }
+    if contestant_row is None:
+        form_data["id_number"] = encrypt_value(id_number)
     if data.organization:
         form_data["organization"] = data.organization
     # Custom fields are stored as-is (caller is responsible for not putting PII in them)
@@ -107,7 +145,13 @@ async def register(db: AsyncSession, data: RegistrationCreate, contestant_id: in
         form_data=form_data,
     )
     db.add(reg)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        # 兜底并发竞态：唯一索引 ux_registrations_contest_group_contestant
+        # 拦截同账号同赛事同组别的重复提交（含双击/重试）
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="您已提交过报名，请勿重复提交")
     await db.refresh(reg)
     return reg
 
@@ -144,6 +188,37 @@ async def get_registration(db: AsyncSession, reg_id: int) -> Registration:
     if not reg:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="报名记录不存在")
     return reg
+
+
+async def serialize_registrations(db: AsyncSession, regs: list[Registration]) -> list[dict]:
+    """Serialize Registrations for admin APIs with masked PII.
+
+    Account-bound registrations do not carry id_number in form_data;
+    the masked value is injected from the contestant account instead.
+    Contestants are fetched in one batch query to avoid N+1.
+    """
+    cids = {r.contestant_id for r in regs if r.contestant_id}
+    masked_ids: dict[int, str] = {}
+    if cids:
+        c_rows = await db.execute(
+            select(Contestant.id, Contestant.id_number).where(Contestant.id.in_(cids))
+        )
+        masked_ids = {cid: mask_id_number(idn) for cid, idn in c_rows.all() if idn}
+
+    outs = []
+    for reg in regs:
+        out = RegistrationOut.model_validate(reg).model_dump()
+        form_data = dict(out.get("form_data") or {})
+        if not form_data.get("id_number") and reg.contestant_id in masked_ids:
+            form_data["id_number"] = masked_ids[reg.contestant_id]
+        out["form_data"] = form_data
+        outs.append(out)
+    return outs
+
+
+async def serialize_registration(db: AsyncSession, reg: Registration) -> dict:
+    """Serialize a single Registration (see serialize_registrations)."""
+    return (await serialize_registrations(db, [reg]))[0]
 
 
 async def soft_delete_registration(db: AsyncSession, reg_id: int):

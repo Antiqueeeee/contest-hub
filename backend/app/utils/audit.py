@@ -15,6 +15,7 @@ from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_log import AuditLog
+from app.utils.request_ip import get_client_ip
 
 
 async def log_event(
@@ -39,10 +40,7 @@ async def log_event(
     # Auto-extract IP and User-Agent from the request object if available
     if request:
         if not ip_address:
-            forwarded = request.headers.get("X-Forwarded-For")
-            ip_address = (forwarded.split(",")[0].strip() if forwarded
-                          else request.client.host if request.client
-                          else "")
+            ip_address = get_client_ip(request)
         if not user_agent:
             user_agent = request.headers.get("User-Agent", "")
 

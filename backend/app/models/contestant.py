@@ -12,6 +12,8 @@ class Contestant(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     name: Mapped[str] = mapped_column(String(50), nullable=False)
-    id_number: Mapped[str] = mapped_column(EncryptedString(512), nullable=False)
+    # Nullable: id_number is collected lazily at first contest registration
+    # (最小必要原则), then bound to the account and reused.
+    id_number: Mapped[str | None] = mapped_column(EncryptedString(512), nullable=True)
     organization: Mapped[str | None] = mapped_column(String(200), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

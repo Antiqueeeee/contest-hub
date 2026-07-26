@@ -19,8 +19,10 @@ export default function ContestRegisterPage() {
   const [contest, setContest] = useState<Contest | null>(null)
   const [loading, setLoading] = useState(true)
   const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [idNumber, setIdNumber] = useState(''); const [organization, setOrganization] = useState(''); const [groupId, setGroupId] = useState('')
+  const [profileIdNumber, setProfileIdNumber] = useState<string | null>(user?.id_number || null)
   const [customValues, setCustomValues] = useState<Record<number, string>>({})
   const [privacyAgreed, setPrivacyAgreed] = useState(false)
+  const [idNumberAgreed, setIdNumberAgreed] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
 
@@ -32,10 +34,10 @@ export default function ContestRegisterPage() {
       // Fetch latest profile to ensure id_number is available (handles stale sessionStorage)
       const ca = contestantApi()
       ca.get<any>('/contestant/profile').then(p => {
-        setIdNumber(p.id_number || ''); setOrganization(p.organization || '')
+        setProfileIdNumber(p.id_number || null); setOrganization(p.organization || '')
       }).catch(() => {
         // Fallback to sessionStorage data
-        setIdNumber(user.id_number || ''); setOrganization(user.organization || '')
+        setProfileIdNumber(user.id_number || null); setOrganization(user.organization || '')
       })
     }
   }, [id, isLoggedIn, user, loading, navigate])
@@ -47,11 +49,16 @@ export default function ContestRegisterPage() {
   if (contest.registration_start && now < new Date(contest.registration_start)) return <div className="text-center py-12"><p className="text-muted-foreground">报名尚未开始</p><Link to={`/contests/${contest.id}`}><Button variant="link" className="mt-2">返回赛事详情</Button></Link></div>
   if (contest.registration_end && now > new Date(contest.registration_end)) return <div className="text-center py-12"><p className="text-muted-foreground">报名已截止</p><Link to={`/contests/${contest.id}`}><Button variant="link" className="mt-2">返回赛事详情</Button></Link></div>
 
+  const needIdNumber = !isLoggedIn || !profileIdNumber
+
   const validate = () => {
     const e: Record<string, string> = {}
     if (!name || name.length < 2 || name.length > 20) e.name = '请输入 2-20 位的真实姓名'
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = '请输入正确的邮箱地址'
-    if (!isLoggedIn && (!idNumber || !/^\d{17}[\dXx]$/.test(idNumber))) e.idNumber = '请输入正确的18位身份证号'
+    if (needIdNumber) {
+      if (!idNumber || !/^\d{17}[\dXx]$/.test(idNumber)) e.idNumber = '请输入正确的18位身份证号'
+      else if (!idNumberAgreed) e.idNumber = '身份证号属于敏感个人信息，请勾选单独同意后再提交'
+    }
     if (!privacyAgreed) e.privacy = '请阅读并同意隐私政策'
     contest.fields?.filter(f => f.is_required).forEach(f => { if (!customValues[f.id]?.trim()) e[`f${f.id}`] = `请填写${f.field_name}` })
     setErrors(e); return Object.keys(e).length === 0
@@ -63,7 +70,8 @@ export default function ContestRegisterPage() {
       const cf: Record<string, string> = {}
       contest.fields?.forEach(f => { if (customValues[f.id]) cf[f.field_name] = customValues[f.id] })
       const res = await contestantApi().post<{ registration_number: string }>(`/public/contests/${contest.id}/register`, {
-        contest_id: contest.id, group_id: groupId ? Number(groupId) : null, name, email, id_number: isLoggedIn ? null : idNumber, organization: organization || null, custom_fields: cf, privacy_agreed: privacyAgreed,
+        contest_id: contest.id, group_id: groupId ? Number(groupId) : null, name, email, organization: organization || null, custom_fields: cf, privacy_agreed: privacyAgreed,
+        ...(needIdNumber ? { id_number: idNumber, id_number_agreed: idNumberAgreed } : {}),
       })
       navigate(`/contests/${contest.id}/register/success`, { state: { registrationNumber: res.registration_number, contestTitle: contest.title, name } })
     } catch (e) { alert(e instanceof Error ? e.message : '报名失败') }
@@ -85,10 +93,18 @@ export default function ContestRegisterPage() {
           <div className="space-y-1"><Label>姓名 <span className="text-destructive">*</span></Label><Input value={name} onChange={e => { setName(e.target.value); setErrors({}) }} placeholder="请输入真实姓名" disabled={isLoggedIn} />{errors.name && <p className="text-sm text-destructive">{errors.name}</p>}</div>
           <div className="space-y-1"><Label>邮箱 <span className="text-destructive">*</span></Label><Input value={email} onChange={e => { setEmail(e.target.value); setErrors({}) }} placeholder="请输入邮箱地址" disabled={isLoggedIn} />{errors.email && <p className="text-sm text-destructive">{errors.email}</p>}</div>
           <div className="space-y-1"><Label>身份证号 <span className="text-destructive">*</span></Label>
-            {isLoggedIn ? (
-              <p className="h-10 flex items-center text-sm text-muted-foreground">{idNumber || '—'}</p>
+            {isLoggedIn && profileIdNumber ? (
+              <p className="h-10 flex items-center text-sm text-muted-foreground">身份证号：{profileIdNumber}（使用账号绑定的身份证信息参赛）</p>
             ) : (
-              <Input value={idNumber} onChange={e => { setIdNumber(e.target.value); setErrors({}) }} placeholder="18位身份证号码" maxLength={18} />
+              <>
+                <Input value={idNumber} onChange={e => { setIdNumber(e.target.value); setErrors({}) }} placeholder="18位身份证号码" maxLength={18} />
+                <p className="text-xs text-muted-foreground">您的身份证号属于敏感个人信息，仅用于赛事报名核验，不会公开</p>
+                <div className="flex items-start gap-2 pt-1">
+                  <Checkbox id="idNumberAgreed" checked={idNumberAgreed} onCheckedChange={v => { setIdNumberAgreed(!!v); setErrors({}) }} />
+                  <Label htmlFor="idNumberAgreed" className="text-sm text-muted-foreground cursor-pointer">我同意平台收集我的身份证号用于赛事报名核验</Label>
+                </div>
+                {isLoggedIn && <p className="text-xs text-muted-foreground">提交后该身份证号将绑定到您的账号</p>}
+              </>
             )}
             {errors.idNumber && <p className="text-sm text-destructive">{errors.idNumber}</p>}
           </div>
@@ -121,7 +137,7 @@ export default function ContestRegisterPage() {
               {errors[`f${f.id}`] && <p className="text-sm text-destructive">{errors[`f${f.id}`]}</p>}
             </div>
           ))}
-          <div className="flex items-start gap-2 pt-2"><Checkbox id="privacy" checked={privacyAgreed} onCheckedChange={v => { setPrivacyAgreed(!!v); setErrors({}) }} /><Label htmlFor="privacy" className="text-sm text-muted-foreground cursor-pointer">我已阅读并同意《隐私政策》</Label></div>
+          <div className="flex items-start gap-2 pt-2"><Checkbox id="privacy" checked={privacyAgreed} onCheckedChange={v => { setPrivacyAgreed(!!v); setErrors({}) }} /><Label htmlFor="privacy" className="text-sm text-muted-foreground cursor-pointer">我已阅读并同意<Link to="/privacy" target="_blank" className="text-primary hover:underline">《隐私政策》</Link></Label></div>
           {errors.privacy && <p className="text-sm text-destructive">{errors.privacy}</p>}
           <Button className="w-full" size="lg" onClick={handleSubmit} disabled={submitting}>{submitting ? '提交中...' : '提交报名'}</Button>
         </CardContent></Card>

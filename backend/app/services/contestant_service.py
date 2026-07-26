@@ -38,7 +38,8 @@ def _build_auth_response(contestant: Contestant) -> dict:
             "id": contestant.id,
             "name": contestant.name,
             "email": contestant.email,
-            "id_number": mask_id_number(contestant.id_number),
+            # May be None until the contestant binds an id_number at first registration.
+            "id_number": mask_id_number(contestant.id_number) if contestant.id_number else None,
             "organization": contestant.organization,
         },
     }
@@ -57,7 +58,6 @@ async def register_contestant(db: AsyncSession, data: ContestantRegister) -> dic
         email=data.email,
         password_hash=hash_password(data.password),
         name=data.name,
-        id_number=data.id_number,
         organization=data.organization,
     )
     db.add(c)
@@ -103,6 +103,9 @@ async def update_contestant_profile(
         c.email = data.email
     if data.organization is not None:
         c.organization = data.organization
+    if data.id_number is not None:
+        # 选手绑定/更正本人身份证号（格式与校验位已在 schema 层校验）
+        c.id_number = data.id_number
 
     await db.commit()
     await db.refresh(c)
@@ -112,8 +115,12 @@ async def update_contestant_profile(
 # ── My registrations / results ───────────────────────────────────
 
 
-async def _enrich_registration_item(db: AsyncSession, reg: Registration) -> dict:
-    """Given a Registration row, build the response dict with masked PII."""
+async def _enrich_registration_item(db: AsyncSession, reg: Registration, account_masked_id: str | None = None) -> dict:
+    """Given a Registration row, build the response dict with masked PII.
+
+    account_masked_id: 调用方批量预取的账号脱敏身份证号（避免逐条查询）；
+    传入 None 时按需要现场查询。
+    """
     from app.models.contest import Contest, ContestStatus
     from app.utils.crypto import decrypt_value
 
@@ -137,6 +144,15 @@ async def _enrich_registration_item(db: AsyncSession, reg: Registration) -> dict
     safe_form_data = dict(reg.form_data)
     if "id_number" in safe_form_data:
         safe_form_data["id_number"] = mask_id_number(decrypt_value(safe_form_data["id_number"]))
+    elif reg.contestant_id:
+        # 账号绑定的报名不在 form_data 冗余存身份证号，从账号取并脱敏
+        if account_masked_id is None:
+            c = await db.execute(select(Contestant).where(Contestant.id == reg.contestant_id))
+            contestant_row = c.scalar_one_or_none()
+            if contestant_row and contestant_row.id_number:
+                account_masked_id = mask_id_number(contestant_row.id_number)
+        if account_masked_id:
+            safe_form_data["id_number"] = account_masked_id
 
     item = {
         "id": reg.id,
@@ -172,9 +188,16 @@ async def get_my_registrations(db: AsyncSession, contestant_id: int) -> list[dic
     )
     regs = list(result.scalars().all())
 
+    # 同一选手只取一次账号脱敏身份证号，避免逐条报名重复查询
+    account_masked_id = None
+    if regs:
+        c = await get_contestant_profile(db, contestant_id)
+        if c.id_number:
+            account_masked_id = mask_id_number(c.id_number)
+
     output = []
     for reg in regs:
-        item = await _enrich_registration_item(db, reg)
+        item = await _enrich_registration_item(db, reg, account_masked_id)
         output.append(item)
     return output
 

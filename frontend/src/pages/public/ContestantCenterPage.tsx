@@ -18,6 +18,10 @@ export default function ContestantCenterPage() {
   const [editEmail, setEditEmail] = useState('')
   const [editOrganization, setEditOrganization] = useState('')
   const [saving, setSaving] = useState(false)
+  const [idNumber, setIdNumber] = useState<string | null>(null)
+  const [newIdNumber, setNewIdNumber] = useState('')
+  const [idNumberMsg, setIdNumberMsg] = useState('')
+  const [savingIdNumber, setSavingIdNumber] = useState(false)
   const [activeTab, setActiveTab] = useState('records')
 
   useEffect(() => {
@@ -27,6 +31,7 @@ export default function ContestantCenterPage() {
     const ca = contestantApi()
     ca.get<any>('/contestant/profile').then(p => {
       setEditOrganization(p.organization || '')
+      setIdNumber(p.id_number || null)
     }).catch(() => {})
     ca.get<any>('/contestant/registrations').then(r => {
       setRecords(r.items || [])
@@ -38,6 +43,21 @@ export default function ContestantCenterPage() {
     try { await updateProfile(editName, editEmail, editOrganization) }
     catch { alert('保存失败') }
     finally { setSaving(false) }
+  }
+
+  const handleSaveIdNumber = async () => {
+    setIdNumberMsg('')
+    if (!/^\d{17}[\dXx]$/.test(newIdNumber)) { setIdNumberMsg('请输入正确的18位身份证号'); return }
+    setSavingIdNumber(true)
+    try {
+      await contestantApi().put('/contestant/profile', { id_number: newIdNumber })
+      const p = await contestantApi().get<any>('/contestant/profile')
+      setIdNumber(p.id_number || null)
+      setNewIdNumber('')
+      setIdNumberMsg('身份证号保存成功')
+    } catch (e) {
+      setIdNumberMsg(e instanceof Error ? e.message : '保存失败')
+    } finally { setSavingIdNumber(false) }
   }
 
   if (dataLoading) return <div className="text-center py-20 text-muted-foreground">加载中...</div>
@@ -149,6 +169,20 @@ export default function ContestantCenterPage() {
                   <div className="space-y-1.5"><Label>邮箱（登录账号）</Label><Input value={editEmail} onChange={e => setEditEmail(e.target.value)} /><p className="text-xs text-muted-foreground">修改后下次请使用新邮箱登录</p></div>
                   <div className="space-y-1.5"><Label>学校/单位</Label><Input value={editOrganization} onChange={e => setEditOrganization(e.target.value)} maxLength={200} /><p className="text-xs text-muted-foreground">选填</p></div>
                   <Button onClick={handleSaveProfile} disabled={saving} className="w-full">{saving ? '保存中...' : '保存修改'}</Button>
+                </CardContent>
+              </Card>
+              <Card className="border-0 shadow-sm max-w-md">
+                <CardContent className="space-y-4 pt-6">
+                  <div className="space-y-1.5">
+                    <Label>身份证号</Label>
+                    <p className="text-sm text-muted-foreground">{idNumber || '未绑定'}</p>
+                    <p className="text-xs text-muted-foreground">身份证号属于敏感个人信息，仅用于赛事报名核验，不会公开</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Input value={newIdNumber} onChange={e => { setNewIdNumber(e.target.value); setIdNumberMsg('') }} placeholder={idNumber ? '输入新的18位身份证号以更正' : '输入18位身份证号以绑定'} maxLength={18} />
+                    {idNumberMsg && <p className={`text-sm ${idNumberMsg.includes('成功') ? 'text-green-600' : 'text-destructive'}`}>{idNumberMsg}</p>}
+                  </div>
+                  <Button onClick={handleSaveIdNumber} disabled={savingIdNumber || !newIdNumber} className="w-full">{savingIdNumber ? '保存中...' : idNumber ? '更正身份证号' : '绑定身份证号'}</Button>
                 </CardContent>
               </Card>
             </div>

@@ -68,7 +68,7 @@ export default function AdminUsersPage() {
             <div className="space-y-1"><Label>用户名</Label><Input value={editing?.username ?? ''} onChange={e => setEditing(p => p ? { ...p, username: e.target.value } : null)} disabled={!!editing?.id} /></div>
             <div className="space-y-1"><Label>姓名</Label><Input value={editing?.name ?? ''} onChange={e => setEditing(p => p ? { ...p, name: e.target.value } : null)} /></div>
             <div className="space-y-1"><Label>手机号</Label><Input value={editing?.phone ?? ''} onChange={e => setEditing(p => p ? { ...p, phone: e.target.value } : null)} /></div>
-            {!editing?.id && <div className="space-y-1"><Label>密码</Label><Input type="password" value={editing?.password ?? ''} onChange={e => setEditing(p => p ? { ...p, password: e.target.value } : null)} placeholder="6-20位" /></div>}
+            {!editing?.id && <div className="space-y-1"><Label>密码</Label><Input type="password" value={editing?.password ?? ''} onChange={e => setEditing(p => p ? { ...p, password: e.target.value } : null)} placeholder="8-64位，含字母/数字/符号中至少两种" /></div>}
           </div>
           <DialogFooter><Button onClick={handleSave}>保存</Button></DialogFooter>
         </DialogContent>

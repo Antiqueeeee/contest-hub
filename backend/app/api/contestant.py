@@ -4,13 +4,16 @@ from app.database import get_db
 from app.middleware.contestant_auth import get_current_contestant
 from app.schemas.contestant import ContestantRegister, ContestantLogin, ContestantProfileUpdate
 from app.services import contestant_service
+from app.services.login_guard import check_login_allowed
 from app.utils.crypto import mask_id_number
 from app.utils.audit import log_event
+from app.utils.rate_limit import rate_limit
 
 router = APIRouter(prefix="/api", tags=["选手"])
 
 
-@router.post("/auth/contestant/register")
+@router.post("/auth/contestant/register",
+             dependencies=[Depends(rate_limit("contestant_register", max_requests=10, window_seconds=60))])
 async def register(data: ContestantRegister, request: Request, db: AsyncSession = Depends(get_db)):
     result = await contestant_service.register_contestant(db, data)
     await log_event(db, "contestant_register", operator=data.email, operator_id=result["user"]["id"],
@@ -18,8 +21,10 @@ async def register(data: ContestantRegister, request: Request, db: AsyncSession 
     return result
 
 
-@router.post("/auth/contestant/login")
+@router.post("/auth/contestant/login",
+             dependencies=[Depends(rate_limit("contestant_login", max_requests=10, window_seconds=60))])
 async def login(data: ContestantLogin, request: Request, db: AsyncSession = Depends(get_db)):
+    await check_login_allowed(db, operator=data.email, request=request)
     try:
         result = await contestant_service.login_contestant(db, data.email, data.password)
         await log_event(db, "contestant_login_success", operator=data.email, operator_id=result["user"]["id"],
@@ -37,7 +42,8 @@ async def get_profile(current: dict = Depends(get_current_contestant), db: Async
             "id_number": mask_id_number(c.id_number), "organization": c.organization}
 
 
-@router.put("/contestant/profile")
+@router.put("/contestant/profile",
+            dependencies=[Depends(rate_limit("profile_update", max_requests=10, window_seconds=60))])
 async def update_profile(data: ContestantProfileUpdate, current: dict = Depends(get_current_contestant), db: AsyncSession = Depends(get_db)):
     c = await contestant_service.update_contestant_profile(db, current["contestant_id"], data)
     return {"id": c.id, "name": c.name, "email": c.email,
