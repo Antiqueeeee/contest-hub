@@ -101,6 +101,8 @@ export function PublicLayout() {
       <footer className="border-t bg-card mt-16">
         <div className="max-w-6xl mx-auto px-6 py-10 text-center text-sm text-muted-foreground">
           © 2026 竞赛信息发布平台
+          <span className="mx-2">·</span>
+          <Link to="/privacy" className="hover:text-foreground hover:underline">隐私政策</Link>
         </div>
       </footer>
     </div>

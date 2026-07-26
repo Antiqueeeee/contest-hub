@@ -8,6 +8,7 @@ const pages = [
   { key: 'about', label: '平台介绍' },
   { key: 'faq', label: '常见问题' },
   { key: 'contact', label: '联系我们' },
+  { key: 'privacy_policy', label: '隐私政策' },
 ]
 
 export default function SiteContentPage() {

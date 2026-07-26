@@ -27,6 +27,7 @@ import ContestantLoginPage from '@/pages/public/LoginPage'
 import ContestantRegisterPage from '@/pages/public/ContestantRegisterPage'
 import ContestantCenterPage from '@/pages/public/ContestantCenterPage'
 import AboutPage from '@/pages/public/AboutPage'
+import PrivacyPage from '@/pages/public/PrivacyPage'
 import PublicContestListPage from '@/pages/public/PublicContestListPage'
 import PublicNewsListPage from '@/pages/public/PublicNewsListPage'
 import GeneralResultQueryPage from '@/pages/public/GeneralResultQueryPage'
@@ -46,6 +47,7 @@ export default function App() {
       <Route element={<PublicLayout />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/about" element={<AboutPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/contests" element={<PublicContestListPage />} />
         <Route path="/contests/:id" element={<ContestDetailPage />} />
         <Route path="/contests/:id/register" element={<ContestRegisterPage />} />
