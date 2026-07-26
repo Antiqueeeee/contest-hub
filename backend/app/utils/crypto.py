@@ -43,6 +43,28 @@ def decrypt_value(token: str) -> str:
         return token
 
 
+# ── Blind index for encrypted columns ────────────────────────────
+
+
+def keyed_hash(value: str) -> str:
+    """HMAC-SHA256 digest of a normalized value, keyed by the encryption key.
+
+    Used as a blind index for encrypted PII columns (e.g. contestant email):
+    the stored email is Fernet-encrypted (non-deterministic), so equality
+    lookups go through this deterministic keyed hash instead.
+    """
+    import hashlib
+    import hmac
+
+    settings = get_settings()
+    normalized = (value or "").strip().lower()
+    return hmac.new(
+        settings.encryption_key.encode("utf-8"),
+        normalized.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
 # ── PII masking (display-safe representations) ───────────────────
 
 

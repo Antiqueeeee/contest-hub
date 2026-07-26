@@ -5,12 +5,17 @@ from pydantic import BaseModel, Field, field_validator
 from app.utils.validators import validate_id_number, validate_password_strength
 
 
+def _strip(v):
+    """去掉首尾空白（邮箱等标识类字段，与 keyed_hash 的归一化对齐）。"""
+    return v.strip() if isinstance(v, str) else v
+
+
 class ContestantRegister(BaseModel):
     """Data required to register a new contestant account.
 
     身份证号不在注册时收集（最小必要原则），在首次报名时绑定到账号。
     """
-    email: str = Field(max_length=255)
+    email: str = Field(min_length=3, max_length=255)
     password: str = Field(min_length=8, max_length=64)
     name: str = Field(min_length=2, max_length=20)
     organization: str | None = Field(default=None, max_length=200)
@@ -18,6 +23,7 @@ class ContestantRegister(BaseModel):
     privacy_agreed: bool
 
     _password_strength = field_validator("password")(validate_password_strength)
+    _email_strip = field_validator("email")(_strip)
 
     @field_validator("privacy_agreed")
     @classmethod
@@ -32,17 +38,20 @@ class ContestantLogin(BaseModel):
     email: str
     password: str
 
+    _email_strip = field_validator("email")(_strip)
+
 
 class ContestantProfileUpdate(BaseModel):
     """Fields that can be updated on a contestant profile."""
     name: str | None = None
-    email: str | None = None
+    email: str | None = Field(default=None, min_length=3, max_length=255)
     organization: str | None = None
     id_number: str | None = None
 
     _id_number_valid = field_validator("id_number")(
         lambda v: validate_id_number(v) if v is not None else v
     )
+    _email_strip = field_validator("email")(_strip)
 
 
 class DeactivateRequest(BaseModel):

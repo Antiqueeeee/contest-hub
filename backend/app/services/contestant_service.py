@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 import secrets
 from jose import jwt
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 
@@ -12,7 +13,7 @@ from app.models.result import Result
 from app.schemas.contestant import ContestantRegister, ContestantProfileUpdate
 from app.services.auth_service import hash_password, verify_password
 from app.services.result_service import lookup_award_name
-from app.utils.crypto import mask_id_number, mask_email  # mask_id_number used in _enrich_registration_item
+from app.utils.crypto import keyed_hash, mask_id_number, mask_email  # mask_id_number used in _enrich_registration_item
 
 
 # ── Token ────────────────────────────────────────────────────────
@@ -51,25 +52,32 @@ def _build_auth_response(contestant: Contestant) -> dict:
 
 async def register_contestant(db: AsyncSession, data: ContestantRegister) -> dict:
     """Create a new contestant account and return an auth token."""
-    existing = await db.execute(select(Contestant).where(Contestant.email == data.email))
+    email_hash = keyed_hash(data.email)
+    existing = await db.execute(select(Contestant).where(Contestant.email_hash == email_hash))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该邮箱已注册")
 
     c = Contestant(
         email=data.email,
+        email_hash=email_hash,
         password_hash=hash_password(data.password),
         name=data.name,
         organization=data.organization,
     )
     db.add(c)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        # 并发下同邮箱注册撞 email_hash 唯一索引
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该邮箱已注册")
     await db.refresh(c)
     return _build_auth_response(c)
 
 
 async def login_contestant(db: AsyncSession, email: str, password: str) -> dict:
     """Authenticate a contestant by email/password and return an auth token."""
-    result = await db.execute(select(Contestant).where(Contestant.email == email))
+    result = await db.execute(select(Contestant).where(Contestant.email_hash == keyed_hash(email)))
     c = result.scalar_one_or_none()
     if not c:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="邮箱未注册")
@@ -124,8 +132,10 @@ async def deactivate_contestant(db: AsyncSession, contestant_id: int, password: 
             form_data["email"] = mask_email(form_data["email"])
             reg.form_data = form_data
 
-    # 历史同意流水中的明文邮箱脱敏
+    # 历史同意流水中的明文邮箱脱敏（append-only 触发器的合规维护通道）
+    from sqlalchemy import text as sa_text
     from app.models.consent_log import ConsentLog
+    await db.execute(sa_text("SET LOCAL app.log_maintenance = 'on'"))
     consent_rows = (await db.execute(
         select(ConsentLog).where(ConsentLog.contestant_id == contestant_id)
     )).scalars().all()
@@ -139,6 +149,7 @@ async def deactivate_contestant(db: AsyncSession, contestant_id: int, password: 
     c.id_number = None
     c.organization = None
     c.email = f"deleted_{c.id}@deleted.invalid"
+    c.email_hash = keyed_hash(c.email)
     c.password_hash = hash_password(secrets.token_urlsafe(32))  # 不可再登录
     c.deleted_at = datetime.now(timezone.utc)
     await db.commit()
@@ -178,11 +189,12 @@ async def update_contestant_profile(
 
     if data.name is not None:
         c.name = data.name
-    if data.email is not None and data.email != c.email:
-        existing = await db.execute(select(Contestant).where(Contestant.email == data.email))
+    if data.email is not None and keyed_hash(data.email) != c.email_hash:
+        existing = await db.execute(select(Contestant).where(Contestant.email_hash == keyed_hash(data.email)))
         if existing.scalar_one_or_none():
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该邮箱已被使用")
         c.email = data.email
+        c.email_hash = keyed_hash(data.email)
     if data.organization is not None:
         c.organization = data.organization
     if data.id_number is not None:

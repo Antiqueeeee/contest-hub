@@ -9,7 +9,9 @@ class Contestant(Base):
     __tablename__ = "contestants"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    # 邮箱加密存储（个保法第 51 条）；email_hash 为 HMAC 盲索引，登录/查重用
+    email: Mapped[str] = mapped_column(EncryptedString(512), nullable=False)
+    email_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     name: Mapped[str] = mapped_column(String(50), nullable=False)
     # Nullable: id_number is collected lazily at first contest registration
