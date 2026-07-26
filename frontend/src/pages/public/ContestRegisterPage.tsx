@@ -27,7 +27,6 @@ export default function ContestRegisterPage() {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    if (!loading && !isLoggedIn) { navigate(`/login?redirect=/contests/${id}/register`); return }
     api.get<Contest>(`/public/contests/${id}`).then(c => { setContest(c); setLoading(false) }).catch(() => setLoading(false))
     if (isLoggedIn && user) {
       setName(user.name); setEmail(user.email)

@@ -31,7 +31,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   const res = await fetch(`${BASE_URL}${path}`, { ...options, headers })
-  if (res.status === 401) { handleAuthExpired(); throw new Error('登录已过期，请重新登录') }
+  // 认证接口自身的 401（密码错误、账号注销等）要透传后端 detail，不能当作会话过期处理
+  if (res.status === 401 && !path.startsWith('/auth/')) { handleAuthExpired(); throw new Error('登录已过期，请重新登录') }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
     throw new Error(err.detail || `HTTP ${res.status}`)
