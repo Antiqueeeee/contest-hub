@@ -35,6 +35,15 @@ async def get_registration(reg_id: int, request: Request, db: AsyncSession = Dep
     result = await registration_service.get_registration(db, reg_id)
     await log_event(db, "view_registration", operator=current_user["username"], operator_id=current_user["user_id"],
                     target=str(reg_id), target_type="registration", result="success", request=request)
+    # 数据安全法配套：异常批量查看报名详情（含脱敏证号）告警。
+    # 只在越过阈值时告警一次，避免抓取期间告警日志同步放大。
+    from app.utils.audit import count_recent_events
+    recent_views = await count_recent_events(db, "view_registration", operator=current_user["username"], minutes=10)
+    if recent_views == 50:
+        await log_event(db, "security_alert_bulk_view", operator=current_user["username"],
+                        operator_id=current_user["user_id"], target_type="security",
+                        detail={"view_count_10min": recent_views},
+                        result="alert", request=request)
     return await registration_service.serialize_registration(db, result)
 
 

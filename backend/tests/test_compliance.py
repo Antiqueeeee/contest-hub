@@ -399,3 +399,119 @@ async def test_deactivate_masks_consent_log_emails(db, contest):
     assert rows, "应有同意流水"
     for row in rows:
         assert "a@test.com" not in row.email
+
+
+# ── 邮箱加密存储 ─────────────────────────────────────────────────
+
+
+async def test_email_encrypted_with_blind_index(db):
+    from sqlalchemy import text as sa_text
+    from app.utils.crypto import keyed_hash
+
+    cid = await register_contestant(db, "MixedCase@Test.com")
+    c = (await db.execute(select(Contestant).where(Contestant.id == cid))).scalar_one()
+    # 数据库里不是明文
+    assert c.email == "MixedCase@Test.com"  # ORM 读取自动解密
+    raw = await db.execute(sa_text("SELECT email, email_hash FROM contestants WHERE id = :id"), {"id": cid})
+    raw_email, raw_hash = raw.one()
+    assert "@" not in raw_email and raw_email.startswith("gAAAA")  # Fernet 密文
+    assert raw_hash == keyed_hash("mixedcase@test.com")  # 归一化后哈希
+
+    # 大小写不同也算重复
+    with pytest.raises(HTTPException, match="已注册"):
+        await contestant_service.register_contestant(db, make_contestant_payload("mixedcase@test.com"))
+
+    # 登录（不同大小写）正常
+    assert await contestant_service.login_contestant(db, "mixedcase@test.com", "Passw0rd")
+
+
+async def test_profile_email_update_maintains_hash(db):
+    cid = await register_contestant(db)
+    await contestant_service.update_contestant_profile(db, cid, ContestantProfileUpdate(email="new@test.com"))
+    from app.utils.crypto import keyed_hash
+    c = (await db.execute(select(Contestant).where(Contestant.id == cid))).scalar_one()
+    assert c.email_hash == keyed_hash("new@test.com")
+    assert await contestant_service.login_contestant(db, "new@test.com", "Passw0rd")
+    # 占用他人邮箱被拒绝
+    cid2 = await register_contestant(db, "b@test.com")
+    with pytest.raises(HTTPException, match="已被使用"):
+        await contestant_service.update_contestant_profile(db, cid2, ContestantProfileUpdate(email="new@test.com"))
+
+
+# ── 自定义字段敏感信息拦截 ───────────────────────────────────────
+
+
+async def test_sensitive_custom_field_rejected(db):
+    from app.services.contest_service import _validate_custom_fields
+
+    _validate_custom_fields([{"field_name": "兴趣爱好"}])  # 正常字段放行
+    for bad in ("健康状况", "民族", "宗教信仰", "身份证号", "银行卡号"):
+        with pytest.raises(HTTPException) as exc:
+            _validate_custom_fields([{"field_name": bad}])
+        assert "敏感个人信息" in exc.value.detail
+
+
+# ── 审计日志 IP 到期匿名化 ───────────────────────────────────────
+
+
+async def test_cleanup_masks_old_audit_ips(db):
+    from datetime import datetime, timedelta, timezone
+    from app.models.audit_log import AuditLog
+    from app.services.cleanup_service import run_cleanup_once
+
+    db.add(AuditLog(event_type="login_success", operator="admin", ip_address="10.20.30.40",
+                    created_at=datetime.now(timezone.utc) - timedelta(days=200)))
+    db.add(AuditLog(event_type="login_success", operator="admin", ip_address="2001:db8:85a3::8a2e:370:7334",
+                    created_at=datetime.now(timezone.utc) - timedelta(days=200)))
+    db.add(AuditLog(event_type="login_success", operator="admin", ip_address="1.2.3.4"))  # 新日志不动
+    await db.commit()
+
+    stats = await run_cleanup_once(db)
+    assert stats["masked_audit_ips"] == 2
+    rows = (await db.execute(select(AuditLog).order_by(AuditLog.id))).scalars().all()
+    assert rows[0].ip_address == "10.20.x.x"
+    assert rows[1].ip_address == "2001:db8::"  # IPv6 保留前两段前缀
+    assert rows[2].ip_address == "1.2.3.4"
+
+
+async def test_log_append_only_trigger(db):
+    """日志防删改触发器三态：DELETE 禁 / UPDATE 禁 / 维护通道放行。
+
+    测试库由 create_all 建表（不含迁移中的触发器），此处按迁移
+    b8c9d0e1f2a3 的 SQL 手动创建——迁移改动时需同步本测试。
+    """
+    from sqlalchemy import text as sa_text
+
+    await db.execute(sa_text("""
+        CREATE OR REPLACE FUNCTION forbid_log_mutation() RETURNS trigger AS $$
+        BEGIN
+            IF TG_OP = 'DELETE' THEN
+                RAISE EXCEPTION 'audit/consent logs are append-only';
+            END IF;
+            IF current_setting('app.log_maintenance', true) = 'on' THEN
+                RETURN NEW;
+            END IF;
+            RAISE EXCEPTION 'audit/consent logs are append-only';
+        END;
+        $$ LANGUAGE plpgsql;
+    """))
+    await db.execute(sa_text("""
+        CREATE TRIGGER trg_audit_logs_append_only
+        BEFORE UPDATE OR DELETE ON audit_logs
+        FOR EACH ROW EXECUTE FUNCTION forbid_log_mutation();
+    """))
+    from app.models.audit_log import AuditLog
+    db.add(AuditLog(event_type="t", operator="t", ip_address="1.1.1.1"))
+    await db.commit()
+
+    from sqlalchemy.exc import DBAPIError
+    with pytest.raises(DBAPIError):
+        await db.execute(sa_text("DELETE FROM audit_logs"))
+    await db.rollback()
+    with pytest.raises(DBAPIError):
+        await db.execute(sa_text("UPDATE audit_logs SET operator = 'x'"))
+    await db.rollback()
+
+    await db.execute(sa_text("SET LOCAL app.log_maintenance = 'on'"))
+    await db.execute(sa_text("UPDATE audit_logs SET ip_address = '1.1.x.x'"))
+    await db.commit()

@@ -10,6 +10,7 @@ SETTING_DEFS: dict[str, tuple[int, str]] = {
     "registration_retention_days": (180, "赛事结束后报名数据（匿名报名的身份证号）保留天数"),
     "deleted_registration_purge_days": (30, "软删除的报名记录物理清除天数"),
     "export_retention_days": (1, "导出文件在服务器上的保留天数"),
+    "audit_ip_mask_days": (183, "审计日志保留该天数后，IP 地址匿名化（网络安全法要求日志留存≥6个月）"),
 }
 
 

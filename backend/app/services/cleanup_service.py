@@ -27,7 +27,7 @@ logger = logging.getLogger("cleanup")
 async def run_cleanup_once(db: AsyncSession) -> dict:
     """Run all retention cleanup tasks once.  Returns counters for logging."""
     now = datetime.now(timezone.utc)
-    stats = {"purged_registrations": 0, "cleared_id_numbers": 0, "deleted_exports": 0}
+    stats = {"purged_registrations": 0, "cleared_id_numbers": 0, "deleted_exports": 0, "masked_audit_ips": 0}
 
     # 1. 物理清除软删已久的报名记录
     #    排除已有成绩的报名：results.registration_id 外键无级联，
@@ -79,4 +79,26 @@ async def run_cleanup_once(db: AsyncSession) -> dict:
                 os.remove(path)
             except OSError as e:
                 logger.warning("failed to remove export file %s: %s", path, e)
+
+    # 4. 审计日志 IP 到期匿名化：日志本身保留≥6个月（网安法），
+    #    期满后 IP 作为个人信息不再保留精确值（个保法）。
+    #    IPv4 保留前两段（a.b.x.x），IPv6 保留前两段前缀（a:b::）。
+    #    append-only 触发器的合规维护通道（SET LOCAL 仅本事务有效）。
+    from sqlalchemy import text as sa_text
+    mask_days = await get_setting_int(db, "audit_ip_mask_days")
+    await db.execute(sa_text("SET LOCAL app.log_maintenance = 'on'"))
+    ip_result = await db.execute(sa_text("""
+        UPDATE audit_logs
+        SET ip_address = CASE
+            WHEN position(':' in ip_address) > 0
+            THEN split_part(ip_address, ':', 1) || ':' || split_part(ip_address, ':', 2) || '::'
+            ELSE regexp_replace(ip_address, '(\\.[0-9]+){1,2}$', '.x.x')
+        END
+        WHERE created_at < :cutoff
+          AND ip_address <> ''
+          AND ip_address NOT LIKE '%.x.x'
+          AND ip_address NOT LIKE '%::'
+    """), {"cutoff": now - timedelta(days=mask_days)})
+    stats["masked_audit_ips"] = ip_result.rowcount or 0
+    await db.commit()
     return stats

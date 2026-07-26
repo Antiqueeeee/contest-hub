@@ -8,6 +8,29 @@ from app.models.contest import Contest, ContestGroup, Award, ContestField, Conte
 from app.schemas.contest import ContestCreate, ContestUpdate
 from app.utils.timezone import to_aware
 
+# 个保法配套管控：自定义报名字段禁止收集敏感个人信息类别（第 28/30 条）。
+# 身份证号由系统字段统一收集（加密存储+单独同意），不允许通过自定义字段重复收集。
+SENSITIVE_FIELD_KEYWORDS = (
+    "身份证", "身份證", "护照", "護照", "军官证", "港澳台", "通行证",
+    "健康", "病史", "病历", "疾病", "医疗",
+    "民族", "宗教", "信仰", "政治面貌",
+    "指纹", "人脸", "面部", "声纹", "虹膜", "基因", "生物特征",
+    "银行卡", "信用卡", "账户密码",
+)
+
+
+def _validate_custom_fields(fields: list) -> None:
+    """Reject custom registration fields that would collect sensitive PII."""
+    for f in fields:
+        name = (f.field_name if hasattr(f, "field_name") else f.get("field_name", "")) or ""
+        for kw in SENSITIVE_FIELD_KEYWORDS:
+            if kw in name:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"自定义字段「{name}」疑似收集敏感个人信息（命中关键词「{kw}」），"
+                           "平台禁止通过自定义字段收集此类信息；身份证号请使用系统内置字段",
+                )
+
 
 def _build_contest_select():
     return (
@@ -172,6 +195,7 @@ async def create_contest(db: AsyncSession, data: ContestCreate, creator_id: int)
     for a in data.awards:
         ad = a.model_dump() if hasattr(a, 'model_dump') else a
         db.add(Award(contest_id=contest.id, **ad))
+    _validate_custom_fields(data.fields)
     for f in data.fields:
         fd = f.model_dump() if hasattr(f, 'model_dump') else f
         db.add(ContestField(contest_id=contest.id, **fd))
@@ -260,6 +284,7 @@ async def update_contest(db: AsyncSession, contest_id: int, data: ContestUpdate)
                 db.add(Award(contest_id=contest_id, **ad))
 
     if fields_data is not None:
+        _validate_custom_fields(fields_data)
         existing = (await db.execute(select(ContestField).where(ContestField.contest_id == contest_id, ContestField.deleted_at.is_(None)))).scalars().all()
         for ef in existing:
             ef.deleted_at = datetime.now(timezone.utc)

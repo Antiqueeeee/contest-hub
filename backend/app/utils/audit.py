@@ -60,3 +60,24 @@ async def log_event(
         await db.commit()
     except Exception:
         pass  # never let audit logging break the request
+
+
+async def count_recent_events(
+    db: AsyncSession,
+    event_type: str,
+    *,
+    operator: str,
+    minutes: int,
+) -> int:
+    """Count audit events of a type by an operator within the last N minutes."""
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import func, select
+
+    since = datetime.now(timezone.utc) - timedelta(minutes=minutes)
+    result = await db.execute(
+        select(func.count(AuditLog.id))
+        .where(AuditLog.event_type == event_type)
+        .where(AuditLog.operator == operator)
+        .where(AuditLog.created_at >= since)
+    )
+    return result.scalar() or 0
