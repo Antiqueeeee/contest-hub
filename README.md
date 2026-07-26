@@ -33,9 +33,15 @@ contest-hub/
 │       └── middleware/    # 认证中间件
 ├── docs/              # 文档
 │   ├── PRD.md                        # 完整 PRD
-│   └── functional-requirements.md    # 功能需求
+│   ├── functional-requirements.md    # 功能需求
+│   ├── 客户操作手册.md                # 交付后客户（非技术）必读：上线 checklist + 日常注意事项
+│   ├── compliance-gaps.md            # 合规差距分析（法规对照与整改记录）
+│   ├── incident-response.md          # 数据安全事件应急预案
+│   └── pia-report.md                 # 个人信息保护影响评估报告
 └── README.md
 ```
+
+> **交付提示**：部署完成后，请把 `docs/客户操作手册.md` 交给客户——里面用非技术语言写清了上线前必须做的事（改密码、填隐私政策、配 HTTPS、设备份）和日常使用注意事项。
 
 ## 部署方式
 
@@ -427,6 +433,7 @@ npm run dev
 - 在线报名参赛
 - 查询个人成绩
 - 个人中心：我的报名、我的成绩
+- 隐私与安全：修改密码、授权管理（撤回同意）、导出我的数据、注销账号
 
 ### 管理后台
 
@@ -435,9 +442,10 @@ npm run dev
 - 组别管理（学历分组、技能分组等模板）
 - 报名管理（查看/筛选/软删除）
 - 成绩管理（录入/批量导入/发布/撤回）
-- 数据导出（Excel 异步生成）
-- 站点内容管理（关于/FAQ/联系页面可编辑）
-- 管理员账号管理
+- 数据导出（Excel 异步生成，导出文件每日自动清理）
+- 站点内容管理（关于/FAQ/联系/隐私政策页面可编辑）
+- 系统设置（数据保留期限：报名/软删清除/导出文件/审计日志 IP）
+- 管理员账号管理 + 修改密码
 
 ### 赛事状态流转
 
@@ -459,8 +467,12 @@ npm run dev
 - `GET|POST|PATCH /api/admin/results` — 成绩管理
 - `POST /api/admin/export` — 数据导出
 - `GET|PUT /api/admin/site-content/:key` — 站点内容
+- `GET|PUT /api/admin/settings` — 系统设置（数据保留期限）
+- `POST /api/auth/password` — 管理员修改密码
 - `GET /api/public/*` — 前台公开接口
 - `GET|PUT /api/contestant/*` — 选手个人接口
+- `POST /api/contestant/password|deactivate` — 选手改密/注销
+- `GET /api/contestant/my-data|consents` — 个人数据查阅/同意管理
 
 ## 环境变量
 
