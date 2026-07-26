@@ -39,8 +39,12 @@ class Settings(BaseSettings):
 
     # Export
     export_dir: str = "./exports"
-    export_retention_days: int = 7
+    export_retention_days: int = 7   # 默认值已移至 system_settings（后台可配，默认 1 天）；此项仅作兼容保留
     export_max_rows: int = 50_000
+
+    # 强制 HTTPS（等保 2.0 通信保密性）：开启后敏感接口在非 https 请求下拒绝。
+    # 仅在站点已配置 HTTPS 后开启，依赖外层代理正确传递 X-Forwarded-Proto。
+    force_https: bool = False
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

@@ -108,7 +108,7 @@ docker compose up -d --build
 | 入口 | 地址 | 账号 |
 |------|------|------|
 | 前台首页 | http://你的服务器IP | 选手注册登录 |
-| 管理后台 | http://你的服务器IP/admin/login | admin / admin123 |
+| 管理后台 | http://你的服务器IP/admin/login | admin / 随机初始密码（见 backend 日志） |
 
 ### 常用运维命令
 
@@ -124,12 +124,17 @@ docker compose exec backend python seed.py              # docker-compose exec ..
 
 ### 数据备份
 
-```bash
-# 备份数据库（旧版将 docker compose 替换为 docker-compose）
-docker compose exec db pg_dump -U contest contest_hub > backup.sql
+推荐使用备份脚本 `scripts/backup.sh`：自动 gzip 压缩、备份文件按时间戳命名、保留最近 30 天。
 
-# 定期备份（crontab）
-0 3 * * * cd /opt/contest-hub && docker compose exec -T db pg_dump -U contest contest_hub > /backup/contest_$(date +\%Y\%m\%d).sql
+```bash
+# 手动执行一次备份（输出到 backups/contest_hub_YYYYMMDD_HHMMSS.sql.gz）
+bash scripts/backup.sh
+
+# 定期备份（crontab，每天凌晨 3 点）
+0 3 * * * cd /opt/contest-hub && bash scripts/backup.sh >> backups/backup.log 2>&1
+
+# 恢复备份
+gunzip -c backups/contest_hub_XXXXXXXX_XXXXXX.sql.gz | docker compose exec -T db psql -U contest contest_hub
 ```
 
 ### 配置 HTTPS
@@ -161,7 +166,7 @@ server {
 }
 ```
 
-**外层 nginx 必须设置 `X-Forwarded-Proto: https`**，项目内的 nginx 会自动透传，后端据此正确处理 CORS 和重定向。
+**外层 nginx 必须设置 `X-Forwarded-Proto: https`**，同时编辑 `frontend/nginx.conf` 顶部的 map，取消注释 `"~." $http_x_forwarded_proto;` 一行以透传该头（出于安全考虑默认不透传），然后重新构建前端镜像。后端据此正确处理 CORS、重定向及 `FORCE_HTTPS` 判定。
 
 使用 Let's Encrypt 免费获取证书：
 
@@ -365,7 +370,7 @@ sudo nginx -t && sudo systemctl reload nginx
 | 入口 | 地址 | 账号 |
 |------|------|------|
 | 前台首页 | http://你的服务器IP | 选手注册登录 |
-| 管理后台 | http://你的服务器IP/admin/login | admin / admin123 |
+| 管理后台 | http://你的服务器IP/admin/login | admin / 随机初始密码（见 backend 日志） |
 
 ---
 
@@ -411,7 +416,7 @@ npm run dev
 | 入口 | 地址 | 账号 |
 |------|------|------|
 | 前台首页 | http://localhost:5173 | 选手注册登录 |
-| 管理后台 | http://localhost:5173/admin/login | admin / admin123 |
+| 管理后台 | http://localhost:5173/admin/login | admin / 随机初始密码（见 backend 日志） |
 
 ## 功能概览
 
@@ -496,4 +501,4 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 | 手机号 | AES 加密（Fernet） | `138****5678` |
 | 密码 | bcrypt 单向哈希 | 永不返回 |
 
-导出 Excel 时身份证号自动脱敏。
+导出 Excel 含**明文**身份证号（用于主办归档报送），文件默认仅保留 1 天（后台「系统设置」可配），由每日清理任务自动删除。

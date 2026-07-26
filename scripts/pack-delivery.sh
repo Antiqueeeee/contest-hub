@@ -104,7 +104,7 @@ docker compose up -d --build
 | 入口 | 地址 | 账号 |
 |------|------|------|
 | 前台首页 | http://服务器IP | 选手注册登录 |
-| 管理后台 | http://服务器IP/admin/login | admin / admin123 |
+| 管理后台 | http://服务器IP/admin/login | admin / 随机初始密码（见 backend 日志） |
 
 ## 修改代码后重新部署
 

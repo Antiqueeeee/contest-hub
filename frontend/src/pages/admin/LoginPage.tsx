@@ -10,8 +10,8 @@ import { Trophy } from 'lucide-react'
 const bgGradient = { background: 'linear-gradient(135deg, hsl(243 75% 59%) 0%, hsl(271 81% 56%) 100%)' }
 
 export default function LoginPage() {
-  const [username, setUsername] = useState('admin')
-  const [password, setPassword] = useState('123456')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const { login, isLoggedIn } = useAuth()
@@ -66,7 +66,6 @@ export default function LoginPage() {
             <Button type="submit" className="w-full h-10" style={bgGradient} disabled={submitting}>
               {submitting ? '登录中...' : '登录'}
             </Button>
-            <p className="text-xs text-muted-foreground text-center">演示账号: admin / 任意密码</p>
           </form>
         </CardContent>
       </Card>
