@@ -40,3 +40,4 @@ docker-images/docker-compose-linux-*
 # Misc
 *.log
 exports/
+backups/

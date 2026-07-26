@@ -8,6 +8,9 @@ from app.models.site_content import SiteContent
 from app.models.group_template import GroupTemplate, GroupItem
 from app.models.carousel_slide import CarouselSlide
 from app.models.audit_log import AuditLog
+from app.models.consent_log import ConsentLog
+from app.models.system_setting import SystemSetting
+from app.models.export_task import ExportTask
 
 __all__ = [
     "User",

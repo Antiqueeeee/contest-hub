@@ -17,6 +17,7 @@ import ExportPage from '@/pages/admin/ExportPage'
 import SiteContentPage from '@/pages/admin/SiteContentPage'
 import GroupManagementPage from '@/pages/admin/GroupManagementPage'
 import CarouselPage from '@/pages/admin/CarouselPage'
+import AdminSettingsPage from '@/pages/admin/AdminSettingsPage'
 import HomePage from '@/pages/public/HomePage'
 import NewsDetailPage from '@/pages/public/NewsDetailPage'
 import ContestDetailPage from '@/pages/public/ContestDetailPage'
@@ -88,6 +89,7 @@ export default function App() {
         <Route path="site-content" element={<SiteContentPage />} />
         <Route path="carousel" element={<CarouselPage />} />
         <Route path="groups" element={<GroupManagementPage />} />
+        <Route path="settings" element={<AdminSettingsPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

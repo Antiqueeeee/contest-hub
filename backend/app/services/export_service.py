@@ -28,9 +28,6 @@ FIELD_LABELS = {
     "scores": "评分详情",
 }
 
-# In-memory export task store
-_export_tasks: dict[str, dict] = {}
-
 thin_border = Border(
     left=Side(style='thin'), right=Side(style='thin'),
     top=Side(style='thin'), bottom=Side(style='thin'),
@@ -178,14 +175,25 @@ def _auto_fit_columns(ws: Worksheet) -> None:
 
 async def submit_export_task(
     db: AsyncSession, export_type: str, contest_id: int, field_names: list[str],
-    group_ids: list[int] | None = None,
+    group_ids: list[int] | None = None, created_by: int | None = None,
 ) -> str:
-    """Create an async export task: fetch data, render Excel, and save to disk.
+    """Create an export task (persisted in DB): fetch data, render Excel, save to disk.
 
     Returns a task_id for polling via get_export_task_status.
+    导出文件含明文身份证号，由清理任务按 export_retention_days 定期删除。
     """
+    from app.models.export_task import ExportTask
+
     settings = get_settings()
-    task_id = str(uuid.uuid4())[:8]
+
+    # 8 位短 id 撞主键概率极低（且文件 1 天即清理），冲突时重试一次即可
+    for _attempt in range(2):
+        task_id = str(uuid.uuid4())[:8]
+        existing = await get_export_task_status(db, task_id)
+        if not existing:
+            break
+    else:
+        raise RuntimeError("导出任务 ID 生成冲突，请重试")
 
     # Resolve contest info for the download filename
     from app.models.contest import Contest
@@ -197,10 +205,9 @@ async def submit_export_task(
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     download_filename = f"{contest_title}_{type_label}_{timestamp}.xlsx"
 
-    _export_tasks[task_id] = {
-        "status": "processing", "file_path": None,
-        "created_at": datetime.now(timezone.utc), "filename": download_filename,
-    }
+    task = ExportTask(id=task_id, status="processing", filename=download_filename, created_by=created_by)
+    db.add(task)
+    await db.commit()
 
     try:
         wb = Workbook()
@@ -237,18 +244,28 @@ async def submit_export_task(
         file_path = os.path.join(settings.export_dir, filename)
         wb.save(file_path)
 
-        _export_tasks[task_id]["status"] = "completed"
-        _export_tasks[task_id]["file_path"] = file_path
+        task.status = "completed"
+        task.file_path = file_path
 
     except Exception as e:
-        _export_tasks[task_id] = {
-            "status": "failed", "file_path": None,
-            "error": str(e), "created_at": _export_tasks[task_id]["created_at"],
-        }
+        task.status = "failed"
+        task.error = str(e)[:1000]
 
+    await db.commit()
     return task_id
 
 
-def get_export_task_status(task_id: str) -> dict | None:
-    """Return the current status and file path for an export task, or None if the task_id is unknown."""
-    return _export_tasks.get(task_id)
+async def get_export_task_status(db: AsyncSession, task_id: str) -> dict | None:
+    """Return the current status and file path for an export task, or None if unknown."""
+    from app.models.export_task import ExportTask
+    from sqlalchemy import select
+    task = (await db.execute(select(ExportTask).where(ExportTask.id == task_id))).scalar_one_or_none()
+    if not task:
+        return None
+    return {
+        "status": task.status,
+        "file_path": task.file_path or None,
+        "filename": task.filename,
+        "error": task.error,
+        "created_at": task.created_at,
+    }

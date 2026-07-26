@@ -53,11 +53,13 @@ async def delete_registration(reg_id: int, request: Request, db: AsyncSession = 
 async def submit_registration(
     contest_id: int,
     data: RegistrationCreate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     contestant: dict | None = Depends(get_optional_contestant),
 ):
     data.contest_id = contest_id
-    return await registration_service.register(db, data, contestant_id=contestant["contestant_id"] if contestant else None)
+    return await registration_service.register(db, data, contestant_id=contestant["contestant_id"] if contestant else None,
+                                               request=request)
 
 
 # --- Export ---
@@ -66,7 +68,8 @@ async def submit_registration(
                     dependencies=[Depends(rate_limit("export", max_requests=10, window_seconds=60))])
 async def submit_export(data: ExportRequest, request: Request, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     task_id = await export_service.submit_export_task(
-        db, data.export_type, data.contest_id, data.fields, data.group_ids
+        db, data.export_type, data.contest_id, data.fields, data.group_ids,
+        created_by=current_user["user_id"],
     )
     await log_event(db, "export_data", operator=current_user["username"], operator_id=current_user["user_id"],
                     target=f"contest/{data.contest_id}", target_type="export",
@@ -76,8 +79,8 @@ async def submit_export(data: ExportRequest, request: Request, db: AsyncSession 
 
 
 @export_router.get("/tasks/{task_id}")
-async def get_task_status(task_id: str, current_user: dict = Depends(get_current_user)):
-    task = export_service.get_export_task_status(task_id)
+async def get_task_status(task_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    task = await export_service.get_export_task_status(db, task_id)
     if not task:
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="任务不存在")
@@ -85,10 +88,10 @@ async def get_task_status(task_id: str, current_user: dict = Depends(get_current
 
 
 @export_router.get("/download/{task_id}")
-async def download_export(task_id: str, current_user: dict = Depends(get_current_user)):
+async def download_export(task_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     from fastapi.responses import FileResponse
     from fastapi import HTTPException
-    task = export_service.get_export_task_status(task_id)
+    task = await export_service.get_export_task_status(db, task_id)
     if not task or task["status"] != "completed":
         raise HTTPException(status_code=404, detail="文件不存在或尚未生成完成")
     if not task.get("file_path"):

@@ -1,13 +1,23 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { api } from '@/api/client'
 import {
   LayoutDashboard, Newspaper, Flag, ClipboardList, BarChart3, FileSpreadsheet,
-  Users, LogOut, ChevronDown, ChevronRight, Trophy, FileText, Images,
+  Users, LogOut, ChevronDown, ChevronRight, Trophy, FileText, Images, Settings, KeyRound,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Collapsible } from '@/components/ui/collapsible'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+
+function passwordValid(pwd: string) {
+  if (pwd.length < 8 || pwd.length > 64) return false
+  const types = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter(r => r.test(pwd)).length
+  return types >= 2
+}
 
 const sidebarNavItems = [
   { to: '/admin', icon: LayoutDashboard, label: '首页概览' },
@@ -31,6 +41,7 @@ const sidebarNavItems = [
   { to: '/admin/site-content', icon: FileText, label: '站点内容' },
   { to: '/admin/carousel', icon: Images, label: '轮播图管理' },
   { to: '/admin/users', icon: Users, label: '管理员管理' },
+  { to: '/admin/settings', icon: Settings, label: '系统设置' },
 ]
 
 export function AdminSidebar() {
@@ -107,6 +118,37 @@ export function AdminSidebar() {
 export function AdminLayout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const [pwdOpen, setPwdOpen] = useState(false)
+  const [oldPassword, setOldPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [pwdMsg, setPwdMsg] = useState('')
+  const [savingPwd, setSavingPwd] = useState(false)
+
+  const openPwdDialog = () => {
+    setOldPassword('')
+    setNewPassword('')
+    setConfirmPassword('')
+    setPwdMsg('')
+    setPwdOpen(true)
+  }
+
+  const handleChangePassword = async () => {
+    setPwdMsg('')
+    if (!oldPassword) { setPwdMsg('请输入原密码'); return }
+    if (!passwordValid(newPassword)) { setPwdMsg('新密码需8-64位，且包含大写字母/小写字母/数字/符号中至少两种'); return }
+    if (newPassword !== confirmPassword) { setPwdMsg('两次输入的新密码不一致'); return }
+    setSavingPwd(true)
+    try {
+      await api.post('/auth/password', { old_password: oldPassword, new_password: newPassword })
+      setOldPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      setPwdMsg('密码修改成功')
+    } catch (e) {
+      setPwdMsg(e instanceof Error ? e.message : '修改失败')
+    } finally { setSavingPwd(false) }
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -119,6 +161,9 @@ export function AdminLayout() {
               <AvatarFallback className="text-xs bg-primary text-primary-foreground">{user?.name?.charAt(0) ?? '管'}</AvatarFallback>
             </Avatar>
             <span className="text-sm text-muted-foreground hidden sm:inline">{user?.name}</span>
+            <Button variant="ghost" size="sm" onClick={openPwdDialog} title="修改密码">
+              <KeyRound className="h-4 w-4" />
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => { logout(); navigate('/admin/login') }}>
               <LogOut className="h-4 w-4" />
             </Button>
@@ -128,6 +173,22 @@ export function AdminLayout() {
           <Outlet />
         </main>
       </div>
+
+      <Dialog open={pwdOpen} onOpenChange={setPwdOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>修改密码</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1"><Label>原密码</Label><Input type="password" value={oldPassword} onChange={e => { setOldPassword(e.target.value); setPwdMsg('') }} placeholder="请输入原密码" /></div>
+            <div className="space-y-1"><Label>新密码</Label><Input type="password" value={newPassword} onChange={e => { setNewPassword(e.target.value); setPwdMsg('') }} placeholder="8-64位，含字母/数字/符号中至少两种" /></div>
+            <div className="space-y-1"><Label>确认新密码</Label><Input type="password" value={confirmPassword} onChange={e => { setConfirmPassword(e.target.value); setPwdMsg('') }} placeholder="再次输入新密码" /></div>
+            {pwdMsg && <p className={`text-sm ${pwdMsg.includes('成功') ? 'text-green-600' : 'text-destructive'}`}>{pwdMsg}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPwdOpen(false)}>关闭</Button>
+            <Button onClick={handleChangePassword} disabled={savingPwd || !oldPassword || !newPassword}>{savingPwd ? '提交中...' : '修改密码'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
