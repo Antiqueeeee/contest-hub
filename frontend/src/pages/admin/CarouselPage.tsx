@@ -29,6 +29,8 @@ interface UploadResult {
 
 const HEIGHT_OPTIONS = [300, 350, 400, 450, 500]
 const EMPTY_FORM = { title: '', image_url: '', link_url: '', sort_order: 0, is_active: true }
+// 与后端 upload_max_size_mb 默认值一致（backend/app/config.py）
+const MAX_UPLOAD_MB = 10
 
 export default function CarouselPage() {
   const [slides, setSlides] = useState<SlideItem[]>([])
@@ -38,6 +40,7 @@ export default function CarouselPage() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null)  // 0..1，null=未在传
   const [, setDragId] = useState<number | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -88,16 +91,24 @@ export default function CarouselPage() {
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    // 选文件即预检大小，避免传一半才发现超限（慢带宽下白等）
+    if (file.size > MAX_UPLOAD_MB * 1024 * 1024) {
+      alert(`图片大小不能超过 ${MAX_UPLOAD_MB}MB，请压缩后重试`)
+      e.target.value = ''
+      return
+    }
     setUploading(true)
+    setUploadProgress(0)
     try {
-      const res = await api.upload<UploadResult>('/admin/upload', file)
+      // 带真实进度的上传：原文件字节级上传，不做任何客户端修改
+      const res = await api.uploadWithProgress<UploadResult>('/admin/upload', file, setUploadProgress)
       setForm(f => ({ ...f, image_url: res.url }))
       if (res.width && res.height) {
         setLastUploadDims({ width: res.width, height: res.height })
       }
     } catch (err: any) {
       alert(err.message || '上传失败')
-    } finally { setUploading(false) }
+    } finally { setUploading(false); setUploadProgress(null) }
   }
 
   const handleSave = async () => {
@@ -285,11 +296,16 @@ export default function CarouselPage() {
                   disabled={uploading}
                 >
                   <Upload className="h-4 w-4 mr-1" />
-                  {uploading ? '上传中...' : '选择图片'}
+                  {uploading && uploadProgress != null ? `上传中 ${Math.round(uploadProgress * 100)}%` : '选择图片'}
                 </Button>
                 <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleUpload} />
                 <Input value={form.image_url} onChange={e => setForm(f => ({ ...f, image_url: e.target.value }))} placeholder="或手动输入图片URL" className="flex-1" />
               </div>
+              {uploading && uploadProgress != null && (
+                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden" role="progressbar" aria-valuenow={Math.round(uploadProgress * 100)} aria-valuemin={0} aria-valuemax={100}>
+                  <div className="h-full bg-primary transition-[width] duration-200" style={{ width: `${Math.round(uploadProgress * 100)}%` }} />
+                </div>
+              )}
               {form.image_url && (
                 <div className="h-32 rounded-md overflow-hidden bg-muted mt-2">
                   <img src={form.image_url} alt="预览" className="h-full w-full object-cover" />

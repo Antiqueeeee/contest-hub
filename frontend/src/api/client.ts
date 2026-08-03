@@ -94,4 +94,34 @@ export const api = {
     }
     return res.json()
   },
+
+  /** Upload with progress events via XMLHttpRequest (fetch has no upload progress).
+   *  onProgress receives a fraction 0..1.  File is sent byte-identical, no client-side
+   *  modification (客户上传什么就是什么). */
+  uploadWithProgress: async <T>(path: string, file: File, onProgress: (ratio: number) => void): Promise<T> => {
+    const token = getToken()
+    return new Promise<T>((resolve, reject) => {
+      const formData = new FormData()
+      formData.append('file', file)
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', `${BASE_URL}${path}`)
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+      xhr.upload.onprogress = e => {
+        if (e.lengthComputable) onProgress(e.loaded / e.total)
+      }
+      xhr.onload = () => {
+        if (xhr.status === 401) { handleAuthExpired(); reject(new Error('登录已过期，请重新登录')); return }
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try { resolve(JSON.parse(xhr.responseText) as T) }
+          catch { reject(new Error('上传响应解析失败')) }
+          return
+        }
+        let detail = `HTTP ${xhr.status}`
+        try { detail = JSON.parse(xhr.responseText).detail || detail } catch { /* keep default */ }
+        reject(new Error(detail))
+      }
+      xhr.onerror = () => reject(new Error('网络错误，上传失败'))
+      xhr.send(formData)
+    })
+  },
 }

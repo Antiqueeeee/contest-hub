@@ -55,18 +55,27 @@ def _validate_image(file: UploadFile) -> None:
 
 
 def _process_image(file_path: str) -> tuple[int, int]:
-    """Strip EXIF and return (width, height). Best-effort — never fails the upload."""
+    """Strip EXIF and return (width, height). Best-effort — never fails the upload.
+
+    PIL 保存时默认不携带 EXIF（需显式传 exif 参数），保存新副本即达成去 EXIF：
+    视觉像素完全不变，但比旧的像素重建（getdata/putdata）快一个量级——
+    大图（数 MB）不再把全部像素拉进内存。
+    """
+    tmp_path = f"{file_path}.clean"
     try:
         from PIL import Image
         img = Image.open(file_path)
         w, h = img.size
-        # Re-save without EXIF by creating a clean copy
-        data = list(img.getdata())
-        clean = Image.new(img.mode, img.size)
-        clean.putdata(data)
-        clean.save(file_path)
+        # 显式传 format：tmp 文件名后缀 .clean 不是 PIL 已知扩展名，不传会 KeyError
+        img.save(tmp_path, format=img.format)
+        os.replace(tmp_path, file_path)
         return w, h
     except Exception:
+        # best-effort：失败时清理半成品，保留原文件，不阻断上传
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
         return 0, 0
 
 
