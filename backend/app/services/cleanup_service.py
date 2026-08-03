@@ -27,7 +27,7 @@ logger = logging.getLogger("cleanup")
 async def run_cleanup_once(db: AsyncSession) -> dict:
     """Run all retention cleanup tasks once.  Returns counters for logging."""
     now = datetime.now(timezone.utc)
-    stats = {"purged_registrations": 0, "cleared_id_numbers": 0, "deleted_exports": 0, "masked_audit_ips": 0}
+    stats = {"purged_registrations": 0, "cleared_pii_fields": 0, "deleted_exports": 0, "masked_audit_ips": 0}
 
     # 1. 物理清除软删已久的报名记录
     #    排除已有成绩的报名：results.registration_id 外键无级联，
@@ -43,7 +43,8 @@ async def run_cleanup_once(db: AsyncSession) -> dict:
     )
     stats["purged_registrations"] = result.rowcount or 0
 
-    # 2. 清除已结束赛事匿名报名中的身份证号
+    # 2. 清除已结束赛事匿名报名中的身份证号（及未成年人保护模块的
+    #    出生日期/监护人信息，同样只存在于匿名报名的 form_data 中）
     retention_days = await get_setting_int(db, "registration_retention_days")
     cutoff = now - timedelta(days=retention_days)
     ended_contest_ids = select(Contest.id).where(Contest.end_date < cutoff.replace(tzinfo=None))
@@ -54,11 +55,14 @@ async def run_cleanup_once(db: AsyncSession) -> dict:
         )
     )).scalars().all()
     for reg in anon_regs:
-        if reg.form_data and reg.form_data.get("id_number"):
-            form_data = dict(reg.form_data)
-            form_data.pop("id_number")
+        form_data = dict(reg.form_data or {})
+        cleared = False
+        for key in ("id_number", "birth_date", "guardian_name", "guardian_contact"):
+            if form_data.pop(key, None) is not None:
+                cleared = True
+        if cleared:
             reg.form_data = form_data
-            stats["cleared_id_numbers"] += 1
+            stats["cleared_pii_fields"] += 1
 
     # 3. 删除过期导出文件与任务记录
     #    先删 DB 记录并提交，再删磁盘文件——避免事务回滚后记录指向已删文件。

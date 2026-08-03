@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.middleware.auth import get_current_user
+from app.middleware.contestant_auth import get_optional_contestant
 from app.schemas.contest import ContestCreate, ContestUpdate, ContestOut
 from app.services import contest_service
 from app.utils.audit import log_event
@@ -90,3 +91,42 @@ async def public_contest_detail(contest_id: int, db: AsyncSession = Depends(get_
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="赛事不存在")
     return c
+
+
+@public_router.get("/{contest_id}/minor-requirement")
+async def public_minor_requirement(
+    contest_id: int,
+    db: AsyncSession = Depends(get_db),
+    contestant: dict | None = Depends(get_optional_contestant),
+):
+    """报名页查询未成年人保护分支要求（登录用户已绑定出生日期时由服务端判定）。
+
+    - active=false：模块未启用（系统开关关闭或赛事未声明面向未成年人）
+    - requirement: unknown=需填出生日期 / guardian=需监护人同意 /
+      statement=需「已满14周岁」声明 / adult=无额外要求
+    """
+    from app.models.contest import MinorPolicy
+    from app.services.settings_service import get_minor_protection_enabled
+    from app.utils.minor import age_at_str, requirement_for_age
+
+    c = await contest_service.get_contest(db, contest_id)
+    if c.minor_policy != MinorPolicy.minors_welcome or not await get_minor_protection_enabled(db):
+        return {"active": False, "requirement": "none"}
+
+    birth_date = None
+    if contestant:
+        from app.models.contestant import Contestant
+        from sqlalchemy import select
+        row = (await db.execute(
+            select(Contestant.birth_date).where(Contestant.id == contestant["contestant_id"])
+        )).scalar_one_or_none()
+        birth_date = row or None
+    if not birth_date:
+        return {"active": True, "requirement": "unknown"}
+
+    start = c.start_date.date() if c.start_date else None
+    at = start if start is not None else None
+    age = age_at_str(birth_date, at) if at else None
+    if age is None:
+        return {"active": True, "requirement": "unknown"}
+    return {"active": True, "requirement": requirement_for_age(age)}

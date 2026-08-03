@@ -1,6 +1,7 @@
 from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
 from app.utils.crypto import decrypt_value, mask_id_number
+from app.utils.minor import mask_birth_date, mask_name, mask_contact
 from app.utils.validators import validate_id_number
 
 
@@ -19,6 +20,16 @@ class RegistrationCreate(BaseModel):
     privacy_agreed: bool
     # 敏感个人信息（身份证号）单独同意，仅在实际提交身份证号时要求。
     id_number_agreed: bool = False
+    # ── 未成年人保护模块（可选启用）────────────────────────────
+    # 仅当系统开关开启且赛事声明面向未成年人时，以下字段按年龄分支必填；
+    # 否则全部可空、不参与任何校验，普通流程不受影响。
+    birth_date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$", description="出生日期 YYYY-MM-DD")
+    guardian_name: str | None = Field(default=None, max_length=100)
+    guardian_contact: str | None = Field(default=None, max_length=200)
+    # 14 岁以下选手：监护人同意（单独同意，独立于隐私政策与身份证号同意）
+    guardian_agreed: bool = False
+    # 14-18 岁选手：本人「已满 14 周岁」声明
+    minor_statement_agreed: bool = False
 
     @field_validator("id_number")
     @classmethod
@@ -55,6 +66,17 @@ class RegistrationOut(BaseModel):
             except Exception:
                 plain = ""
             safe["id_number"] = mask_id_number(plain) if plain else ""
+        # 未成年人保护模块：匿名报名表单中的出生日期/监护人信息（加密存储）
+        for key, masker in (
+            ("birth_date", mask_birth_date),
+            ("guardian_name", mask_name),
+            ("guardian_contact", mask_contact),
+        ):
+            if safe.get(key):
+                try:
+                    safe[key] = masker(decrypt_value(safe[key]))
+                except Exception:
+                    safe[key] = ""
         return safe
 
 

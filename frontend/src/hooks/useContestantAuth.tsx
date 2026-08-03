@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 import { api, BASE_URL } from '@/api/client'
 
-interface Contestant { id: number; name: string; email: string; id_number: string | null; organization: string | null }
+interface Contestant { id: number; name: string; email: string; id_number: string | null; birth_date: string | null; guardian_name: string | null; guardian_contact: string | null; organization: string | null }
 
 const TOKEN_KEY = 'contest_hub_contestant_token'
 const USER_KEY = 'contest_hub_contestant_user'

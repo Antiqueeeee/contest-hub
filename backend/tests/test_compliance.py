@@ -169,7 +169,7 @@ async def test_my_data(db, contest):
     data = await contestant_service.get_my_data(db, cid)
     assert data["profile"]["id_number"] == "1101****7758"
     assert len(data["registrations"]) == 1
-    assert {c["consent_type"] for c in data["consents"]} == {"privacy", "id_number"}
+    assert {c["consent_type"] for c in data["consents"]} == {"privacy", "id_number", "guardian_consent", "minor_statement"}
 
 
 async def test_change_password(db):
@@ -269,7 +269,7 @@ async def test_cleanup_purges_and_clears(db, contest):
     stats = await run_cleanup_once(db)
 
     assert stats["purged_registrations"] == 1
-    assert stats["cleared_id_numbers"] == 1
+    assert stats["cleared_pii_fields"] == 1
     assert stats["deleted_exports"] == 1
     remaining = (await db.execute(select(Registration).where(
         Registration.registration_number == "C-old-deleted"))).scalar_one_or_none()

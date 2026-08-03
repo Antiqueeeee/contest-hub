@@ -172,6 +172,7 @@ async def create_contest(db: AsyncSession, data: ContestCreate, creator_id: int)
         max_participants=data.max_participants,
         score_categories=data.score_categories,
         timezone=data.timezone,
+        minor_policy=data.minor_policy,
     )
     _validate_contest_dates(
         contest.start_date,
@@ -333,6 +334,7 @@ async def copy_contest(db: AsyncSession, contest_id: int, creator_id: int) -> Co
         max_participants=original.max_participants,
         score_categories=original.score_categories,
         timezone=original.timezone,
+        minor_policy=original.minor_policy,
     )
     db.add(new_contest)
     await db.flush()

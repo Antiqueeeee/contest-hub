@@ -41,19 +41,30 @@ async def login(data: ContestantLogin, request: Request, db: AsyncSession = Depe
         raise
 
 
+def _profile_out(c) -> dict:
+    """Profile response with masked PII（出生日期/监护人信息仅返回脱敏值）。"""
+    from app.utils.minor import mask_birth_date, mask_name, mask_contact
+    return {
+        "id": c.id, "name": c.name, "email": c.email,
+        "id_number": mask_id_number(c.id_number),
+        "birth_date": mask_birth_date(c.birth_date) if c.birth_date else None,
+        "guardian_name": mask_name(c.guardian_name) if c.guardian_name else None,
+        "guardian_contact": mask_contact(c.guardian_contact) if c.guardian_contact else None,
+        "organization": c.organization,
+    }
+
+
 @router.get("/contestant/profile")
 async def get_profile(current: dict = Depends(get_current_contestant), db: AsyncSession = Depends(get_db)):
     c = await contestant_service.get_contestant_profile(db, current["contestant_id"])
-    return {"id": c.id, "name": c.name, "email": c.email,
-            "id_number": mask_id_number(c.id_number), "organization": c.organization}
+    return _profile_out(c)
 
 
 @router.put("/contestant/profile",
             dependencies=[Depends(rate_limit("profile_update", max_requests=10, window_seconds=60))])
 async def update_profile(data: ContestantProfileUpdate, current: dict = Depends(get_current_contestant), db: AsyncSession = Depends(get_db)):
     c = await contestant_service.update_contestant_profile(db, current["contestant_id"], data)
-    return {"id": c.id, "name": c.name, "email": c.email,
-            "id_number": mask_id_number(c.id_number), "organization": c.organization}
+    return _profile_out(c)
 
 
 @router.get("/contestant/registrations")

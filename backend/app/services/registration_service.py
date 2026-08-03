@@ -4,12 +4,19 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 
-from app.models.contest import Contest, ContestGroup, ContestStatus
+from app.models.contest import Contest, ContestGroup, ContestStatus, MinorPolicy
 from app.models.contestant import Contestant
 from app.models.registration import Registration
 from app.schemas.registration import RegistrationCreate, RegistrationOut
+from app.services.settings_service import get_minor_protection_enabled
 from app.utils.timezone import to_aware
 from app.utils.crypto import encrypt_value, decrypt_value, mask_id_number
+from app.utils.minor import (
+    GUARDIAN_AGE_LIMIT,
+    ADULT_AGE_LIMIT,
+    parse_birth_date,
+    age_at_str,
+)
 
 
 def _gen_registration_number(contest_id: int, seq: int) -> str:
@@ -52,6 +59,60 @@ async def register(db: AsyncSession, data: RegistrationCreate, contestant_id: in
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="赛事不存在")
     if contest.status != ContestStatus.open:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该赛事当前不可报名")
+
+    # ── 未成年人保护分支（条件性必填，仅双开关开启时生效）─────────
+    # 系统开关 off 或赛事 minor_policy=normal 时，本模块完全不介入：
+    # 年龄/监护人字段可空、不校验、不入库，普通流程与现状一致。
+    minor_active = False
+    birth_date = ""
+    age = None
+    if contest.minor_policy == MinorPolicy.minors_welcome and await get_minor_protection_enabled(db):
+        minor_active = True
+        # 账号已绑定的出生日期复用（懒收集），否则用表单提交值
+        if contestant_row is not None and contestant_row.birth_date:
+            birth_date = contestant_row.birth_date
+        else:
+            birth_date = data.birth_date or ""
+        if not birth_date:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="该赛事面向未成年人，请填写出生日期")
+        if parse_birth_date(birth_date) is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="出生日期格式不正确")
+        if parse_birth_date(birth_date) > datetime.now(timezone.utc).date():
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="出生日期不能晚于今天")
+        # 资格判定以赛事开始日为准（不是报名日），存生日不存年龄
+        age = age_at_str(birth_date, contest.start_date.date() if contest.start_date else datetime.now(timezone.utc).date())
+        if age is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="出生日期格式不正确")
+        if age < GUARDIAN_AGE_LIMIT:
+            # 监护人信息同样懒收集：账号已登记则复用，否则取表单值
+            guardian_name = (contestant_row.guardian_name if contestant_row and contestant_row.guardian_name
+                             else (data.guardian_name or ""))
+            guardian_contact = (contestant_row.guardian_contact if contestant_row and contestant_row.guardian_contact
+                                else (data.guardian_contact or ""))
+            if not guardian_name or not guardian_contact:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                    detail="14 周岁以下选手报名需填写监护人姓名与联系方式")
+            if not data.guardian_agreed:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                    detail="14 周岁以下选手报名须征得监护人同意，请勾选监护人同意")
+        elif age < ADULT_AGE_LIMIT:
+            if not data.minor_statement_agreed:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                    detail="请勾选确认本人已满 14 周岁后再提交")
+
+    if minor_active and contestant_row is not None:
+        # 未成年人字段懒收集绑定：账号已有值则复用，首次提交时绑定
+        if not contestant_row.birth_date:
+            contestant_row.birth_date = birth_date
+        if age is not None and age < GUARDIAN_AGE_LIMIT:
+            if not contestant_row.guardian_name and data.guardian_name:
+                contestant_row.guardian_name = data.guardian_name
+            if not contestant_row.guardian_contact and data.guardian_contact:
+                contestant_row.guardian_contact = data.guardian_contact
 
     now = datetime.now(timezone.utc)
     tz = contest.timezone
@@ -132,6 +193,12 @@ async def register(db: AsyncSession, data: RegistrationCreate, contestant_id: in
     }
     if contestant_row is None:
         form_data["id_number"] = encrypt_value(id_number)
+        # 匿名报名的未成年人数据随报名保留期清理（见 cleanup_service）
+        if minor_active:
+            form_data["birth_date"] = encrypt_value(birth_date)
+            if age is not None and age < GUARDIAN_AGE_LIMIT:
+                form_data["guardian_name"] = encrypt_value(data.guardian_name or "")
+                form_data["guardian_contact"] = encrypt_value(data.guardian_contact or "")
     if data.organization:
         form_data["organization"] = data.organization
     # Custom fields are stored as-is (caller is responsible for not putting PII in them)
@@ -161,11 +228,18 @@ async def register(db: AsyncSession, data: RegistrationCreate, contestant_id: in
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="报名提交失败，请重试")
 
     # 同意记录持久化（个保法举证）：隐私政策 + （如提交了身份证号）敏感信息单独同意
+    # + 未成年人分支的监护人同意 / 已满 14 周岁声明
     from app.services.consent_service import record_consent
     await record_consent(db, consent_type="privacy", action="granted",
                          contestant_id=contestant_id, email=data.email, request=request)
     if data.id_number and data.id_number_agreed:
         await record_consent(db, consent_type="id_number", action="granted",
+                             contestant_id=contestant_id, email=data.email, request=request)
+    if minor_active and age is not None and age < GUARDIAN_AGE_LIMIT and data.guardian_agreed:
+        await record_consent(db, consent_type="guardian_consent", action="granted",
+                             contestant_id=contestant_id, email=data.email, request=request)
+    elif minor_active and age is not None and age < ADULT_AGE_LIMIT and data.minor_statement_agreed:
+        await record_consent(db, consent_type="minor_statement", action="granted",
                              contestant_id=contestant_id, email=data.email, request=request)
     await db.commit()
 
@@ -214,13 +288,21 @@ async def serialize_registrations(db: AsyncSession, regs: list[Registration]) ->
     the masked value is injected from the contestant account instead.
     Contestants are fetched in one batch query to avoid N+1.
     """
+    from app.utils.minor import mask_birth_date
+
     cids = {r.contestant_id for r in regs if r.contestant_id}
     masked_ids: dict[int, str] = {}
+    masked_births: dict[int, str] = {}
     if cids:
         c_rows = await db.execute(
-            select(Contestant.id, Contestant.id_number).where(Contestant.id.in_(cids))
+            select(Contestant.id, Contestant.id_number, Contestant.birth_date)
+            .where(Contestant.id.in_(cids))
         )
-        masked_ids = {cid: mask_id_number(idn) for cid, idn in c_rows.all() if idn}
+        for cid, idn, birth in c_rows.all():
+            if idn:
+                masked_ids[cid] = mask_id_number(idn)
+            if birth:
+                masked_births[cid] = mask_birth_date(birth)
 
     outs = []
     for reg in regs:
@@ -228,6 +310,9 @@ async def serialize_registrations(db: AsyncSession, regs: list[Registration]) ->
         form_data = dict(out.get("form_data") or {})
         if not form_data.get("id_number") and reg.contestant_id in masked_ids:
             form_data["id_number"] = masked_ids[reg.contestant_id]
+        # 账号绑定的出生日期（报名记录不冗余存储）同样注入脱敏值
+        if not form_data.get("birth_date") and reg.contestant_id in masked_births:
+            form_data["birth_date"] = masked_births[reg.contestant_id]
         out["form_data"] = form_data
         outs.append(out)
     return outs

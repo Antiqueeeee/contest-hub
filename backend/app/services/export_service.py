@@ -11,6 +11,25 @@ from app.services.registration_service import get_registrations_for_export
 from app.services.result_service import list_results
 from app.schemas.result import ResultFilter
 from app.utils.crypto import decrypt_value
+from app.utils.minor import mask_birth_date, mask_name, mask_contact
+
+# 未成年人保护模块：form_data 中的出生日期/监护人信息为密文，
+# 导出时解密后一律脱敏——明文身份证号是已接受的业务需求，
+# 未成年人字段（更敏感）只允许以脱敏形式离开平台。
+MINOR_FORM_FIELD_MASKERS = {
+    "birth_date": mask_birth_date,
+    "guardian_name": mask_name,
+    "guardian_contact": mask_contact,
+}
+
+
+def _export_form_value(form_data: dict, name: str) -> str:
+    """Resolve a form_data field for export: minor fields are decrypted then masked."""
+    raw = form_data.get(name, "")
+    masker = MINOR_FORM_FIELD_MASKERS.get(name)
+    if masker and raw:
+        return masker(decrypt_value(raw))
+    return raw or ""
 
 # Chinese field name mapping
 FIELD_LABELS = {
@@ -103,7 +122,8 @@ def _write_registration_rows(
             elif name == "submitted_at":
                 val = reg.submitted_at.strftime("%Y-%m-%d %H:%M") if reg.submitted_at else ""
             else:
-                val = form_data.get(name, "")
+                # 未成年人字段（form_data 内密文）解密+脱敏；自定义字段原样
+                val = _export_form_value(form_data, name)
             cell = ws.cell(row=row_idx, column=col_idx, value=str(val) if val is not None else "")
             cell.font = body_font
             cell.border = thin_border
@@ -147,6 +167,9 @@ async def _write_result_rows(
                 val = str(r.rank) if r.rank else ""
             elif name == "award":
                 val = ""
+            elif name in MINOR_FORM_FIELD_MASKERS:
+                # 未成年人字段（form_data 内密文）解密+脱敏
+                val = _export_form_value(form_data, name)
             else:
                 val = str(r.scores.get(name, "")) if r.scores else ""
             cell = ws.cell(row=row_idx, column=col_idx, value=str(val) if val is not None else "")

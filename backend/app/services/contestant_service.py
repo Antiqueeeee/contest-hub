@@ -14,6 +14,7 @@ from app.schemas.contestant import ContestantRegister, ContestantProfileUpdate
 from app.services.auth_service import hash_password, verify_password
 from app.services.result_service import lookup_award_name
 from app.utils.crypto import keyed_hash, mask_id_number, mask_email  # mask_id_number used in _enrich_registration_item
+from app.utils.minor import mask_birth_date, mask_name, mask_contact
 
 
 # ── Token ────────────────────────────────────────────────────────
@@ -42,6 +43,10 @@ def _build_auth_response(contestant: Contestant) -> dict:
             "email": contestant.email,
             # May be None until the contestant binds an id_number at first registration.
             "id_number": mask_id_number(contestant.id_number) if contestant.id_number else None,
+            # 未成年人保护模块：出生日期/监护人信息仅返回脱敏值（供报名页判断是否已绑定）
+            "birth_date": mask_birth_date(contestant.birth_date) if contestant.birth_date else None,
+            "guardian_name": mask_name(contestant.guardian_name) if contestant.guardian_name else None,
+            "guardian_contact": mask_contact(contestant.guardian_contact) if contestant.guardian_contact else None,
             "organization": contestant.organization,
         },
     }
@@ -147,6 +152,10 @@ async def deactivate_contestant(db: AsyncSession, contestant_id: int, password: 
     masked_email = mask_email(original_email)
     c.name = "已注销用户"
     c.id_number = None
+    # 未成年人保护模块：出生日期与监护人信息一并清除（不可恢复）
+    c.birth_date = None
+    c.guardian_name = None
+    c.guardian_contact = None
     c.organization = None
     c.email = f"deleted_{c.id}@deleted.invalid"
     c.email_hash = keyed_hash(c.email)
@@ -162,6 +171,7 @@ async def get_my_data(db: AsyncSession, contestant_id: int) -> dict:
     身份证号返回脱敏值——明文只在数据库中存在，接口一律不输出。
     """
     from app.services.consent_service import get_consent_states
+    from app.utils.minor import mask_birth_date, mask_name, mask_contact
 
     c = await get_contestant_profile(db, contestant_id)
     registrations = await get_my_registrations(db, contestant_id)
@@ -172,6 +182,9 @@ async def get_my_data(db: AsyncSession, contestant_id: int) -> dict:
             "email": c.email,
             "name": c.name,
             "id_number": mask_id_number(c.id_number) if c.id_number else None,
+            "birth_date": mask_birth_date(c.birth_date) if c.birth_date else None,
+            "guardian_name": mask_name(c.guardian_name) if c.guardian_name else None,
+            "guardian_contact": mask_contact(c.guardian_contact) if c.guardian_contact else None,
             "organization": c.organization,
             "registered_at": c.created_at.isoformat() if c.created_at else None,
         },
@@ -217,6 +230,7 @@ async def _enrich_registration_item(db: AsyncSession, reg: Registration, account
     """
     from app.models.contest import Contest, ContestStatus
     from app.utils.crypto import decrypt_value
+    from app.utils.minor import mask_birth_date, mask_name, mask_contact
 
     ct = await db.execute(select(Contest).where(Contest.id == reg.contest_id))
     contest = ct.scalar_one_or_none()
@@ -247,6 +261,10 @@ async def _enrich_registration_item(db: AsyncSession, reg: Registration, account
                 account_masked_id = mask_id_number(contestant_row.id_number)
         if account_masked_id:
             safe_form_data["id_number"] = account_masked_id
+    # 未成年人保护模块：匿名报名表单中的出生日期/监护人信息（加密存储）
+    for key, masker in (("birth_date", mask_birth_date), ("guardian_name", mask_name), ("guardian_contact", mask_contact)):
+        if safe_form_data.get(key):
+            safe_form_data[key] = masker(decrypt_value(safe_form_data[key]))
 
     item = {
         "id": reg.id,

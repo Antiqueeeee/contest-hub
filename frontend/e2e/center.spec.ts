@@ -64,7 +64,8 @@ test.describe('个人中心', () => {
     await page.getByRole('button', { name: '撤回' }).click()
     await page.getByRole('button', { name: '确认撤回' }).click()
     await expect(page.getByText(/撤回成功/)).toBeVisible()
-    await expect(page.getByText('未同意')).toBeVisible()
+    // 授权管理现列出全部同意类型（含未成年人模块两项），断言限定在身份证号行内
+    await expect(page.getByText('身份证号收集').locator('..').getByText('未同意')).toBeVisible()
   })
 
   test('C6: 导出我的数据为 JSON 文件', async ({ page }) => {

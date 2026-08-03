@@ -1,5 +1,6 @@
 from datetime import datetime, date, timezone
 from pydantic import BaseModel, Field, model_validator, computed_field
+from app.models.contest import MinorPolicy
 from app.utils.timezone import to_aware
 
 
@@ -70,6 +71,8 @@ class ContestCreate(BaseModel):
     max_participants: int = 0
     score_categories: list[str] = ["客观题得分", "主观题得分"]
     timezone: str = "Asia/Shanghai"
+    # 未成年人保护模块赛事级开关（默认 normal；系统开关关闭时不起作用）
+    minor_policy: MinorPolicy = MinorPolicy.normal
     groups: list[ContestGroupIn] = []
     awards: list[AwardIn] = []
     fields: list[ContestFieldIn] = []
@@ -87,6 +90,7 @@ class ContestUpdate(BaseModel):
     max_participants: int | None = None
     score_categories: list[str] | None = None
     timezone: str | None = None
+    minor_policy: MinorPolicy | None = None
     groups: list[ContestGroupIn] | None = None
     awards: list[AwardIn] | None = None
     fields: list[ContestFieldIn] | None = None
@@ -106,6 +110,7 @@ class ContestOut(BaseModel):
     max_participants: int
     score_categories: list[str] | None = None
     status: str
+    minor_policy: str = "normal"
     created_at: datetime
     updated_at: datetime
     groups: list[ContestGroupOut] = []

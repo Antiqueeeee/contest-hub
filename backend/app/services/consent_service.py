@@ -12,9 +12,12 @@ from app.models.consent_log import ConsentLog
 from app.utils.request_ip import get_client_ip
 
 # 隐私政策内容更新时应递增，历史同意按版本可追溯
-PRIVACY_POLICY_VERSION = "2026-07-26"
+PRIVACY_POLICY_VERSION = "2026-08-03"
 
-CONSENT_TYPES = ("privacy", "id_number")
+# privacy = 隐私政策；id_number = 身份证号（敏感个人信息单独同意）；
+# guardian_consent = 14 岁以下监护人同意（未成年人保护模块）；
+# minor_statement = 14-18 岁「已满 14 周岁」本人声明
+CONSENT_TYPES = ("privacy", "id_number", "guardian_consent", "minor_statement")
 
 
 async def record_consent(
@@ -65,6 +68,8 @@ async def withdraw_consent(db: AsyncSession, contestant_id: int, consent_type: s
     """Withdraw a consent.  Caller is responsible for commit.
 
     - id_number：撤回即解绑身份证号（账号上的密文置空，不可恢复）。
+    - guardian_consent / minor_statement：撤回即删除已收集的出生日期与
+      监护人信息（不可恢复），后续报名面向未成年人的赛事时需重新收集。
     - privacy：隐私政策同意是提供服务的基础，撤回需通过注销账号完成，
       此处拒绝并提示（见端点错误信息）。
     """
@@ -80,7 +85,12 @@ async def withdraw_consent(db: AsyncSession, contestant_id: int, consent_type: s
     from app.services.contestant_service import get_contestant_profile
 
     c = await get_contestant_profile(db, contestant_id)
-    c.id_number = None  # 撤回敏感信息同意 = 删除已收集的身份证号
+    if consent_type == "id_number":
+        c.id_number = None  # 撤回敏感信息同意 = 删除已收集的身份证号
+    elif consent_type in ("guardian_consent", "minor_statement"):
+        c.birth_date = None
+        c.guardian_name = None
+        c.guardian_contact = None
     await record_consent(
         db, consent_type=consent_type, action="withdrawn",
         contestant_id=contestant_id, email=c.email, request=request,

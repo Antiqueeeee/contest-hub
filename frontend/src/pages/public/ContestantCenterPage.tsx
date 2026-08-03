@@ -38,6 +38,7 @@ export default function ContestantCenterPage() {
   const [savingPwd, setSavingPwd] = useState(false)
   const [withdrawOpen, setWithdrawOpen] = useState(false)
   const [withdrawing, setWithdrawing] = useState(false)
+  const [withdrawTarget, setWithdrawTarget] = useState('')  // 当前待撤回的同意类型
   const [consentMsg, setConsentMsg] = useState('')
   const [exporting, setExporting] = useState(false)
   const [deactivatePassword, setDeactivatePassword] = useState('')
@@ -100,13 +101,23 @@ export default function ContestantCenterPage() {
     } finally { setSavingPwd(false) }
   }
 
-  const handleWithdrawIdNumber = async () => {
+  const withdrawTargetLabel: Record<string, string> = {
+    id_number: '身份证号收集',
+    guardian_consent: '监护人同意',
+    minor_statement: '未成年人声明',
+  }
+
+  const handleWithdrawConsent = async () => {
     setConsentMsg('')
     setWithdrawing(true)
     try {
-      await contestantApi().post('/contestant/consents/id_number/withdraw')
+      await contestantApi().post(`/contestant/consents/${withdrawTarget}/withdraw`)
       setWithdrawOpen(false)
-      setConsentMsg('撤回成功：已删除绑定的身份证号，下次报名时需重新填写并单独同意')
+      if (withdrawTarget === 'id_number') {
+        setConsentMsg('撤回成功：已删除绑定的身份证号，下次报名时需重新填写并单独同意')
+      } else {
+        setConsentMsg('撤回成功：已删除绑定的出生日期与监护人信息，下次报名面向未成年人的赛事时需重新确认')
+      }
       const ca = contestantApi()
       const [c, p] = await Promise.all([
         ca.get<any>('/contestant/consents'),
@@ -301,10 +312,15 @@ export default function ContestantCenterPage() {
                     <Label>授权管理</Label>
                     <p className="text-xs text-muted-foreground">管理你对平台收集和使用个人信息的授权</p>
                   </div>
-                  {consents.map(c => (
+                  {consents.map((c: any) => (
                     <div key={c.consent_type} className="flex items-start justify-between gap-3 text-sm border-t pt-3 first:border-0 first:pt-0">
                       <div>
-                        <p className="font-medium">{c.consent_type === 'privacy' ? '隐私政策' : '身份证号收集'}</p>
+                        <p className="font-medium">{({
+                          privacy: '隐私政策',
+                          id_number: '身份证号收集',
+                          guardian_consent: '监护人同意（未成年人参赛）',
+                          minor_statement: '未成年人声明（已满14周岁）',
+                        } as Record<string, string>)[String(c.consent_type)] || c.consent_type}</p>
                         <p className="text-xs text-muted-foreground">
                           {c.granted ? '已同意' : '未同意'}
                           {c.updated_at && ` · ${c.updated_at.split('T')[0]}`}
@@ -313,9 +329,12 @@ export default function ContestantCenterPage() {
                         {c.consent_type === 'privacy' && (
                           <p className="text-xs text-muted-foreground mt-1">隐私政策同意是使用平台服务的基础，如需撤回请注销账号</p>
                         )}
+                        {(c.consent_type === 'guardian_consent' || c.consent_type === 'minor_statement') && (
+                          <p className="text-xs text-muted-foreground mt-1">撤回后将删除账号绑定的出生日期与监护人信息</p>
+                        )}
                       </div>
-                      {c.consent_type === 'id_number' && c.granted && (
-                        <Button variant="outline" size="sm" onClick={() => { setConsentMsg(''); setWithdrawOpen(true) }}>撤回</Button>
+                      {['id_number', 'guardian_consent', 'minor_statement'].includes(c.consent_type) && c.granted && (
+                        <Button variant="outline" size="sm" onClick={() => { setConsentMsg(''); setWithdrawTarget(c.consent_type); setWithdrawOpen(true) }}>撤回</Button>
                       )}
                     </div>
                   ))}
@@ -349,11 +368,15 @@ export default function ContestantCenterPage() {
 
       <Dialog open={withdrawOpen} onOpenChange={setWithdrawOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>撤回身份证号收集同意</DialogTitle></DialogHeader>
-          <DialogDescription>撤回后，账号上绑定的身份证号将被删除，下次报名时需重新填写并单独同意。确定要撤回吗？</DialogDescription>
+          <DialogHeader><DialogTitle>撤回{withdrawTargetLabel[withdrawTarget] || '同意'}同意</DialogTitle></DialogHeader>
+          <DialogDescription>
+            {withdrawTarget === 'id_number'
+              ? '撤回后，账号上绑定的身份证号将被删除，下次报名时需重新填写并单独同意。确定要撤回吗？'
+              : '撤回后，账号上绑定的出生日期与监护人信息将被删除（不可恢复），下次报名面向未成年人的赛事时需重新确认。确定要撤回吗？'}
+          </DialogDescription>
           <DialogFooter>
             <Button variant="outline" onClick={() => setWithdrawOpen(false)}>取消</Button>
-            <Button variant="destructive" onClick={handleWithdrawIdNumber} disabled={withdrawing}>{withdrawing ? '撤回中...' : '确认撤回'}</Button>
+            <Button variant="destructive" onClick={handleWithdrawConsent} disabled={withdrawing}>{withdrawing ? '撤回中...' : '确认撤回'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

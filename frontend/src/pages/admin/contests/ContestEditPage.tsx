@@ -42,6 +42,9 @@ export default function ContestEditPage() {
   const [maxParticipants, setMaxParticipants] = useState('0')
   const [timezone, setTimezone] = useState('Asia/Shanghai')
   const [tzOptions, setTzOptions] = useState<TzOption[]>([])
+  // 未成年人保护模块：系统开关开启时显示「面向未成年人」选项
+  const [minorEnabled, setMinorEnabled] = useState(false)
+  const [minorPolicy, setMinorPolicy] = useState('normal')
 
   // Groups - selected item IDs from templates
   const [templates, setTemplates] = useState<Template[]>([])
@@ -63,12 +66,13 @@ export default function ContestEditPage() {
     // Load templates & timezone options
     api.get<{ items: Template[] }>('/admin/groups/templates').then(r => setTemplates(r.items)).catch(() => {})
     api.get<TzOption[]>('/public/contests/timezones').then(r => setTzOptions(r as any)).catch(() => {})
+    api.get<{ enabled: boolean }>('/admin/settings/minor-protection').then(r => setMinorEnabled(r.enabled)).catch(() => {})
 
     if (!isNew) {
       api.get<{
         title: string; description: string; location: string; start_date: string; end_date: string
         registration_start: string; registration_end: string; max_participants: number; score_categories: string[] | null
-        timezone: string
+        timezone: string; minor_policy?: string
         groups: { id: number; name: string; template_item_id: number }[]; awards: Award[]; fields: Field[]
       }>(`/admin/contests/${id}`).then(c => {
         setTitle(c.title); setDescription(c.description); setLocation(c.location)
@@ -83,6 +87,7 @@ export default function ContestEditPage() {
         setFields(c.fields || [])
         if (c.score_categories?.length) setScoreCategories(c.score_categories)
         if (c.timezone) setTimezone(c.timezone)
+        if (c.minor_policy) setMinorPolicy(c.minor_policy)
         // Map contest groups to template item IDs for checkbox selection
         if (c.groups?.length > 0) {
           setSelectedGroupIds(c.groups.map(g => g.template_item_id || g.id))
@@ -125,6 +130,9 @@ export default function ContestEditPage() {
         score_categories: scoreCategories.filter(s => s.trim()),
         fields: fields.filter(f => f.field_name),
         timezone,
+        // 系统开关关闭时不发送该字段：新建时后端默认 normal，
+        // 编辑存量赛事时避免把已标记的 minors_welcome 静默重置
+        ...(minorEnabled ? { minor_policy: minorPolicy } : {}),
       }
       if (isNew) await api.post('/admin/contests', data)
       else await api.put(`/admin/contests/${id}`, data)
@@ -176,6 +184,21 @@ export default function ContestEditPage() {
               {tzOptions.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
             </select>
           </div>
+          {minorEnabled && (
+            <div className="space-y-1 pt-2">
+              <Label>面向未成年人</Label>
+              <select value={minorPolicy} onChange={e => setMinorPolicy(e.target.value)}
+                className="w-full max-w-xs h-9 rounded-md border border-input bg-background px-3 text-sm text-muted-foreground">
+                <option value="normal">否（普通赛事）</option>
+                <option value="minors_welcome">是（未成年人可报名）</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                {minorPolicy === 'minors_welcome'
+                  ? '报名时将收集出生日期；14 周岁以下选手需提供监护人姓名、联系方式并取得监护人同意，14-18 周岁选手需确认本人已满 14 周岁'
+                  : '本赛事不启用未成年人保护流程，报名与普通赛事一致'}
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

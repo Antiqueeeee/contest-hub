@@ -13,6 +13,17 @@ class ContestStatus(str, enum.Enum):
     cancelled = "cancelled"
 
 
+class MinorPolicy(str, enum.Enum):
+    """赛事级未成年人保护开关（未成年人保护模块）。
+
+    - normal：普通赛事，报名流程与未启用模块时完全一致
+    - minors_welcome：面向未成年人，报名时收集出生日期并按年龄分支
+      （14 岁以下需监护人同意，14-18 岁需本人声明）
+    """
+    normal = "normal"
+    minors_welcome = "minors_welcome"
+
+
 class Contest(Base):
     __tablename__ = "contests"
 
@@ -29,6 +40,7 @@ class Contest(Base):
     max_participants: Mapped[int] = mapped_column(Integer, default=0)
     score_categories: Mapped[list | None] = mapped_column(JSON, nullable=True)
     status: Mapped[ContestStatus] = mapped_column(Enum(ContestStatus), default=ContestStatus.draft, nullable=False)
+    minor_policy: Mapped[MinorPolicy] = mapped_column(Enum(MinorPolicy), default=MinorPolicy.normal, nullable=False)
     timezone: Mapped[str] = mapped_column(String(50), default="Asia/Shanghai", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -13,6 +13,17 @@ SETTING_DEFS: dict[str, tuple[int, str]] = {
     "audit_ip_mask_days": (183, "审计日志保留该天数后，IP 地址匿名化（网络安全法要求日志留存≥6个月）"),
 }
 
+# 未成年人保护模块系统级开关（off=不启用，一切流程与现状一致；on=启用）
+MINOR_PROTECTION_MODE_KEY = "minor_protection_mode"
+
+
+async def get_minor_protection_enabled(db: AsyncSession) -> bool:
+    """系统级未成年人保护开关是否开启（默认关闭）。"""
+    row = (await db.execute(
+        select(SystemSetting).where(SystemSetting.key == MINOR_PROTECTION_MODE_KEY)
+    )).scalar_one_or_none()
+    return bool(row and row.value == "on")
+
 
 async def get_setting_int(db: AsyncSession, key: str) -> int:
     """Read an integer setting, falling back to its default."""

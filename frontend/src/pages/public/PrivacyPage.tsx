@@ -36,17 +36,34 @@ const DEFAULT = `<h1>隐私政策</h1>
 </ul>
 <p>我们将在收到您的请求后尽快处理并回复。</p>`
 
+// 未成年人保护模块启用时追加的系统章节（不随站点内容编辑，内容与后台开关联动）
+const CHILD_SECTION = `<h2>七、儿童个人信息保护</h2>
+<p>本平台已启用未成年人保护机制。对于 14 周岁以下的儿童，我们仅在取得其<strong>监护人同意</strong>后收集儿童个人信息（姓名、出生日期、报名所需信息及监护人联系方式），并仅用于赛事报名、资格核验与成绩发布。</p>
+<ul>
+  <li><strong>出生日期</strong> — 仅用于判断是否属于 14 周岁以下儿童，以加密形式保存</li>
+  <li><strong>监护人同意</strong> — 14 周岁以下选手报名时须由监护人勾选同意，并登记监护人姓名与联系方式</li>
+  <li><strong>监护人权利</strong> — 监护人可代儿童行使查阅、更正、删除个人信息的权利，也可撤回同意；撤回后，儿童的出生日期与监护人信息将被删除</li>
+  <li>14-18 周岁的未成年人报名时，须确认本人已满 14 周岁</li>
+</ul>
+<p>我们以儿童能理解的语言提供本说明。如您为儿童的监护人，对本平台处理儿童个人信息有任何疑问，请通过本政策第六节的联系方式与我们联系。</p>`
+
 export default function PrivacyPage() {
   const [content, setContent] = useState(DEFAULT)
+  const [minorEnabled, setMinorEnabled] = useState(false)
   useEffect(() => {
     api.get<{ content: string }>('/public/site-content/privacy_policy').then(r => {
       if (r.content) setContent(r.content)
     }).catch(() => {})
+    api.get<{ enabled: boolean }>('/public/settings/minor-protection').then(r => setMinorEnabled(r.enabled)).catch(() => {})
   }, [])
+
+  const html = minorEnabled && !content.includes('儿童个人信息保护')
+    ? content + '\n' + CHILD_SECTION
+    : content
 
   return (
     <div className="max-w-4xl mx-auto py-8">
-      <div className="prose prose-sm max-w-none leading-relaxed" dangerouslySetInnerHTML={{ __html: content }} />
+      <div className="prose prose-sm max-w-none leading-relaxed" dangerouslySetInnerHTML={{ __html: html }} />
     </div>
   )
 }

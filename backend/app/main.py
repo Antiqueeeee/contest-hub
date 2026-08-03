@@ -20,7 +20,7 @@ from app.api.site_content import admin_router as site_content_admin, public_rout
 from app.api.groups import router as groups_router
 from app.api.upload import router as upload_router
 from app.api.carousel import admin_router as carousel_admin_router, public_router as carousel_public_router
-from app.api.settings import admin_router as settings_admin_router
+from app.api.settings import admin_router as settings_admin_router, public_router as settings_public_router
 
 logger = logging.getLogger("app")
 
@@ -85,6 +85,7 @@ async def security_middleware(request: Request, call_next):
 app.include_router(auth_router)
 app.include_router(user_admin_router)
 app.include_router(settings_admin_router)
+app.include_router(settings_public_router)
 
 # News
 app.include_router(news_admin_router)

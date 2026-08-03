@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test'
 
-export const API = 'http://localhost:8000/api'
+// 默认与 e2e-env.sh 一致；E2E_API 可覆盖（端口被其他项目占用时用 8001）
+export const API = process.env.E2E_API || 'http://localhost:8000/api'
 export const VALID_ID_A = '110101199003077758'
 export const VALID_ID_B = '320102199505124329'
 export const DEFAULT_PASSWORD = 'Passw0rd!'
@@ -85,6 +86,23 @@ export async function createContest(title: string): Promise<{ id: number; title:
   return { id: c.id, title: c.title }
 }
 
+/** 启用未成年人保护模块（系统级开关，固件）。 */
+export async function enableMinorProtection(): Promise<void> {
+  const token = await adminToken()
+  await apiFetch('/admin/settings/minor-protection', { method: 'PUT', token, body: { enabled: true } })
+}
+
+/** 创建面向未成年人的赛事（未成年人保护模块）。 */
+export async function createMinorContest(title: string): Promise<{ id: number; title: string }> {
+  const c = await createContest(title)
+  const token = await adminToken()
+  return apiFetch(`/admin/contests/${c.id}`, {
+    method: 'PUT',
+    token,
+    body: { minor_policy: 'minors_welcome' },
+  })
+}
+
 /** API 注册选手（固件），返回登录 token。 */
 export async function apiRegisterContestant(
   email: string,
@@ -98,10 +116,15 @@ export async function apiRegisterContestant(
   return { token: r.access_token }
 }
 
-/** API 报名（固件）。带 token 则为账号报名（绑定身份证），不带则为匿名报名。 */
+/** API 报名（固件）。带 token 则为账号报名（绑定身份证），不带则为匿名报名。
+ *  未成年人保护模块字段可选：birthDate/guardianName/guardianContact 仅面向未成年人的赛事生效。 */
 export async function apiRegisterForContest(
   contestId: number,
-  opts: { name: string; email: string; idNumber?: string; token?: string },
+  opts: {
+    name: string; email: string; idNumber?: string; token?: string
+    birthDate?: string; guardianName?: string; guardianContact?: string
+    guardianAgreed?: boolean; minorStatementAgreed?: boolean
+  },
 ): Promise<{ id: number; registration_number: string }> {
   return apiFetch(`/public/contests/${contestId}/register`, {
     method: 'POST',
@@ -112,6 +135,11 @@ export async function apiRegisterForContest(
       email: opts.email,
       privacy_agreed: true,
       ...(opts.idNumber ? { id_number: opts.idNumber, id_number_agreed: true } : {}),
+      ...(opts.birthDate ? { birth_date: opts.birthDate } : {}),
+      ...(opts.guardianName
+        ? { guardian_name: opts.guardianName, guardian_contact: opts.guardianContact || '', guardian_agreed: opts.guardianAgreed ?? true }
+        : {}),
+      ...(opts.minorStatementAgreed ? { minor_statement_agreed: true } : {}),
     },
   })
 }
