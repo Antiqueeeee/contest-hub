@@ -32,6 +32,7 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set}
       JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-120}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost}
+      FORCE_HTTPS: ${FORCE_HTTPS:-false}
       EXPORT_DIR: /app/exports
     volumes:
       - exports:/app/exports
@@ -40,6 +41,8 @@ services:
   frontend:
     build: ./frontend
     restart: always
+    environment:
+      TRUST_PROXY: ${TRUST_PROXY:-false}
     ports:
       - "${PORT:-80}:80"
     depends_on:

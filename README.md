@@ -172,7 +172,7 @@ server {
 }
 ```
 
-**外层 nginx 必须设置 `X-Forwarded-Proto: https`**，同时编辑 `frontend/nginx.conf` 顶部的 map，取消注释 `"~." $http_x_forwarded_proto;` 一行以透传该头（出于安全考虑默认不透传），然后重新构建前端镜像。后端据此正确处理 CORS、重定向及 `FORCE_HTTPS` 判定。
+**外层 nginx 必须设置 `X-Forwarded-Proto: https`**，同时在 `.env` 中设置 `TRUST_PROXY=true`——容器启动时会自动启用 `frontend/nginx.conf` 中的透传 map（出于安全考虑默认不透传，防止直接对外部署时客户端伪造该头）。后端据此正确处理 CORS、重定向及 `FORCE_HTTPS` 判定。
 
 使用 Let's Encrypt 免费获取证书：
 
@@ -180,6 +180,72 @@ server {
 sudo apt install certbot python3-certbot-nginx
 sudo certbot --nginx -d contest.example.com
 ```
+
+> **注意**：容器 nginx 默认占用宿主机 80 端口，与外层 nginx 冲突。配置 HTTPS 前先在 `.env` 中设置 `PORT=8080`（或其它端口），并让外层 nginx `proxy_pass http://127.0.0.1:8080`。云服务器还需在安全组放行 80/443 端口（阿里云 ECS 默认不放行 443）；域名解析到境内服务器必须完成 ICP 备案，否则会被云厂商阻断。
+
+---
+
+### 常见部署问题（国内服务器）
+
+**1. Docker 安装脚本无法访问（`Connection reset by peer`）**
+
+`curl -fsSL https://get.docker.com | bash` 在国内服务器上通常连不上，改用阿里云镜像源安装：
+
+```bash
+# Ubuntu
+apt-get update && apt-get install -y ca-certificates curl
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://mirrors.aliyun.com/docker-ce/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
+https://mirrors.aliyun.com/docker-ce/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" \
+> /etc/apt/sources.list.d/docker.list
+apt-get update && apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+systemctl enable --now docker
+
+# CentOS
+yum install -y yum-utils
+yum-config-manager --add-repo https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+yum install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+systemctl enable --now docker
+```
+
+**2. 普通用户操作 Docker 报 `permission denied ... docker.sock`**
+
+当前用户不在 docker 组。加入后必须重新登录（或 `newgrp docker`）才生效：
+
+```bash
+sudo usermod -aG docker <用户名>
+```
+
+**3. 拉取镜像超时 / `unexpected EOF` / layer `not found`**
+
+Docker Hub 国内无法直连，配置镜像加速器：
+
+```bash
+sudo tee /etc/docker/daemon.json <<'EOF'
+{
+  "registry-mirrors": [
+    "https://docker.m.daocloud.io",
+    "https://docker.1ms.run",
+    "https://docker.xuanyuan.me"
+  ]
+}
+EOF
+sudo systemctl restart docker
+```
+
+加速器不稳定，报错时先重试（`docker compose pull` 支持续传）。若某镜像反复报 `not found`（加速器缓存不一致），换源拉取后重打标签：
+
+```bash
+docker pull docker.m.daocloud.io/library/nginx:alpine
+docker tag docker.m.daocloud.io/library/nginx:alpine nginx:alpine
+```
+
+加速器全部不可用时，改用 [方式二：离线交付](#方式二离线交付)。
+
+**4. GitHub 克隆报 `Permission denied (publickey)`**
+
+public 仓库用 HTTPS 地址克隆即可，无需认证：`git clone https://github.com/...`。确需 SSH 则在服务器上 `ssh-keygen` 生成密钥，把公钥添加到 GitHub 账号。
 
 ---
 
