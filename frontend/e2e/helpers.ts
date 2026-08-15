@@ -92,6 +92,12 @@ export async function enableMinorProtection(): Promise<void> {
   await apiFetch('/admin/settings/minor-protection', { method: 'PUT', token, body: { enabled: true } })
 }
 
+/** 设置选手注册开关（固件，默认开）。 */
+export async function setRegistrationEnabled(enabled: boolean): Promise<void> {
+  const token = await adminToken()
+  await apiFetch('/admin/settings/registration', { method: 'PUT', token, body: { enabled } })
+}
+
 /** 创建面向未成年人的赛事（未成年人保护模块）。 */
 export async function createMinorContest(title: string): Promise<{ id: number; title: string }> {
   const c = await createContest(title)

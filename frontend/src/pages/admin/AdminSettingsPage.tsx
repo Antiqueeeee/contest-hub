@@ -18,6 +18,10 @@ export default function AdminSettingsPage() {
   const [minorEnabled, setMinorEnabled] = useState(false)
   const [minorSaving, setMinorSaving] = useState(false)
   const [minorMsg, setMinorMsg] = useState('')
+  // 选手注册开关（默认开）
+  const [regEnabled, setRegEnabled] = useState(true)
+  const [regSaving, setRegSaving] = useState(false)
+  const [regMsg, setRegMsg] = useState('')
 
   useEffect(() => {
     api.get<{ items: SettingItem[] }>('/admin/settings').then(r => {
@@ -28,6 +32,8 @@ export default function AdminSettingsPage() {
     }).catch(console.error).finally(() => setLoading(false))
     api.get<{ enabled: boolean }>('/admin/settings/minor-protection')
       .then(r => setMinorEnabled(r.enabled)).catch(() => {})
+    api.get<{ enabled: boolean }>('/admin/settings/registration')
+      .then(r => setRegEnabled(r.enabled)).catch(() => {})
   }, [])
 
   const handleToggleMinor = async () => {
@@ -39,6 +45,17 @@ export default function AdminSettingsPage() {
     } catch (e) {
       setMinorMsg(e instanceof Error ? e.message : '保存失败')
     } finally { setMinorSaving(false) }
+  }
+
+  const handleToggleReg = async () => {
+    setRegMsg(''); setRegSaving(true)
+    try {
+      const r = await api.put<{ message: string; enabled: boolean }>('/admin/settings/registration', { enabled: !regEnabled })
+      setRegEnabled(r.enabled)
+      setRegMsg(r.message + (r.enabled ? '' : '：前台注册页将显示「注册暂未开放」'))
+    } catch (e) {
+      setRegMsg(e instanceof Error ? e.message : '保存失败')
+    } finally { setRegSaving(false) }
   }
 
   const handleSave = async () => {
@@ -96,6 +113,22 @@ export default function AdminSettingsPage() {
           {minorEnabled && (
             <p className="text-xs text-muted-foreground">已启用：若赛事面向 14 周岁以下选手，请务必在赛事管理中标记「面向未成年人」，否则平台不会收集监护人同意（责任在赛事主办方）。</p>
           )}
+        </CardContent>
+      </Card>
+
+      <Card className="max-w-md">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">注册开关</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            关闭后前台注册页显示「注册暂未开放」提示，新选手无法注册；已注册选手的登录、报名不受影响。
+          </p>
+          <div className="flex items-center justify-between">
+            <Label className="cursor-pointer">开放注册</Label>
+            <Switch checked={regEnabled} onCheckedChange={handleToggleReg} disabled={regSaving} />
+          </div>
+          {regMsg && <p className={`text-sm ${regMsg.includes('保存成功') ? 'text-green-600' : 'text-destructive'}`}>{regMsg}</p>}
         </CardContent>
       </Card>
     </div>

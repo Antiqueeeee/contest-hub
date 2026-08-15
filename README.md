@@ -534,6 +534,8 @@ npm run dev
 - `POST /api/admin/export` — 数据导出
 - `GET|PUT /api/admin/site-content/:key` — 站点内容
 - `GET|PUT /api/admin/settings` — 系统设置（数据保留期限）
+- `GET|PUT /api/admin/settings/registration` + `GET /api/public/settings/registration` — 注册开关（开放/关闭选手注册，默认开放）
+- `GET|PUT /api/admin/settings/minor-protection` + `GET /api/public/settings/minor-protection` — 未成年人保护开关
 - `POST /api/auth/password` — 管理员修改密码
 - `GET /api/public/*` — 前台公开接口
 - `GET|PUT /api/contestant/*` — 选手个人接口

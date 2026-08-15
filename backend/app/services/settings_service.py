@@ -16,6 +16,9 @@ SETTING_DEFS: dict[str, tuple[int, str]] = {
 # 未成年人保护模块系统级开关（off=不启用，一切流程与现状一致；on=启用）
 MINOR_PROTECTION_MODE_KEY = "minor_protection_mode"
 
+# 选手注册开关（off=关闭注册；on 或行不存在=开放，默认开放）
+REGISTRATION_ENABLED_KEY = "registration_enabled"
+
 
 async def get_minor_protection_enabled(db: AsyncSession) -> bool:
     """系统级未成年人保护开关是否开启（默认关闭）。"""
@@ -23,6 +26,14 @@ async def get_minor_protection_enabled(db: AsyncSession) -> bool:
         select(SystemSetting).where(SystemSetting.key == MINOR_PROTECTION_MODE_KEY)
     )).scalar_one_or_none()
     return bool(row and row.value == "on")
+
+
+async def get_registration_enabled(db: AsyncSession) -> bool:
+    """选手注册是否开放（默认开放：行不存在视为开启）。"""
+    row = (await db.execute(
+        select(SystemSetting).where(SystemSetting.key == REGISTRATION_ENABLED_KEY)
+    )).scalar_one_or_none()
+    return row is None or row.value == "on"
 
 
 async def get_setting_int(db: AsyncSession, key: str) -> int:

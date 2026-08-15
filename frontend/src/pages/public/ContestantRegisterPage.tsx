@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useContestantAuth } from '@/hooks/useContestantAuth'
+import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -24,12 +25,20 @@ export default function RegisterPage() {
   const [privacyAgreed, setPrivacyAgreed] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  // 注册开关：null=加载中（不渲染表单，避免关闭时闪现）；false=已关闭
+  const [regEnabled, setRegEnabled] = useState<boolean | null>(null)
   const { register, isLoggedIn } = useContestantAuth()
   const navigate = useNavigate()
 
   useEffect(() => {
     if (isLoggedIn) navigate('/', { replace: true })
   }, [isLoggedIn, navigate])
+
+  useEffect(() => {
+    api.get<{ enabled: boolean }>('/public/settings/registration')
+      .then(r => setRegEnabled(r.enabled))
+      .catch(() => setRegEnabled(true)) // 拉取失败按开放处理，后端 403 兜底
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setSubmitting(true); setError('')
@@ -40,6 +49,29 @@ export default function RegisterPage() {
     try { await register(email, password, name, organization, privacyAgreed); navigate('/') }
     catch (err: any) { setError(err instanceof Error ? err.message : '注册失败') }
     finally { setSubmitting(false) }
+  }
+
+  if (regEnabled === null) return null
+
+  if (!regEnabled) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <Card className="w-[400px] border-0 shadow-xl">
+          <CardHeader className="text-center pb-2">
+            <div className="flex justify-center mb-4">
+              <div className="h-12 w-12 rounded-xl flex items-center justify-center shadow-lg" style={bgGradient}>
+                <Trophy className="h-6 w-6 text-white" />
+              </div>
+            </div>
+            <CardTitle className="text-xl font-bold">注册暂未开放</CardTitle>
+            <CardDescription>平台当前未开放选手注册，如有疑问请通过「联系我们」页面联系管理员</CardDescription>
+          </CardHeader>
+          <CardContent className="text-center">
+            <p className="text-sm text-muted-foreground">已有账号？<Link to="/login" className="text-primary hover:underline">立即登录</Link></p>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (

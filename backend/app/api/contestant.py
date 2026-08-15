@@ -4,7 +4,7 @@ from app.database import get_db
 from app.middleware.contestant_auth import get_current_contestant
 from app.schemas.contestant import ContestantRegister, ContestantLogin, ContestantProfileUpdate, DeactivateRequest
 from app.schemas.user import PasswordChange
-from app.services import contestant_service, consent_service
+from app.services import contestant_service, consent_service, settings_service
 from app.services.login_guard import check_login_allowed
 from app.utils.crypto import mask_id_number
 from app.utils.audit import log_event
@@ -16,6 +16,8 @@ router = APIRouter(prefix="/api", tags=["选手"])
 @router.post("/auth/contestant/register",
              dependencies=[Depends(rate_limit("contestant_register", max_requests=10, window_seconds=60))])
 async def register(data: ContestantRegister, request: Request, db: AsyncSession = Depends(get_db)):
+    if not await settings_service.get_registration_enabled(db):
+        raise HTTPException(status_code=403, detail="注册功能暂未开放")
     result = await contestant_service.register_contestant(db, data)
     await consent_service.record_consent(
         db, consent_type="privacy", action="granted",

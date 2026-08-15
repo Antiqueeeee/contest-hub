@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { uniqueEmail, DEFAULT_PASSWORD, checkboxRoot } from './helpers'
+import { uniqueEmail, DEFAULT_PASSWORD, checkboxRoot, setRegistrationEnabled } from './helpers'
 
 // 对应 docs/bdd/01-选手注册与登录.feature
 
@@ -48,5 +48,19 @@ test.describe('选手注册', () => {
     // 注册成功进入已登录状态
     await expect(page.getByRole('link', { name: '个人中心' })).toBeVisible()
     await expect(page.getByTitle('退出登录')).toBeVisible()
+  })
+
+  test('R5: 关闭注册开关后前台显示未开放提示，重新开启后恢复', async ({ page }) => {
+    await setRegistrationEnabled(false)
+    try {
+      await page.goto('/register')
+      await expect(page.getByText('注册暂未开放')).toBeVisible()
+      await expect(page.getByPlaceholder('用于登录和接收通知')).toHaveCount(0)
+    } finally {
+      // 无论断言成败都恢复开关，避免连锁影响其他 spec（registration/minor/results 都依赖注册）
+      await setRegistrationEnabled(true)
+    }
+    await page.goto('/register')
+    await expect(page.getByPlaceholder('用于登录和接收通知')).toBeVisible()
   })
 })
