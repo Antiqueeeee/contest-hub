@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ArrowLeft, Calendar, MapPin, Users, Clock, Share2, Trophy, Award, Layers } from 'lucide-react'
+import { sanitizeHtml } from '@/lib/sanitize'
 
 const ctaGradient = { background: 'linear-gradient(135deg, hsl(243 75% 59%), hsl(271 81% 56%))' }
 
@@ -57,7 +58,7 @@ export default function ContestDetailPage() {
         <Button variant="outline" size="lg" className="h-12"><Share2 className="h-4 w-4 mr-2" />分享</Button>
       </div>
 
-      <Card className="border-0 shadow-sm mb-6"><CardHeader><CardTitle className="text-lg">赛事介绍</CardTitle></CardHeader><CardContent><div className="text-foreground/80 leading-relaxed text-sm" dangerouslySetInnerHTML={{ __html: contest.description }} /></CardContent></Card>
+      <Card className="border-0 shadow-sm mb-6"><CardHeader><CardTitle className="text-lg">赛事介绍</CardTitle></CardHeader><CardContent><div className="text-foreground/80 leading-relaxed text-sm" dangerouslySetInnerHTML={{ __html: sanitizeHtml(contest.description) }} /></CardContent></Card>
 
       <div className="grid md:grid-cols-2 gap-6">
         {contest.groups?.length > 0 && (

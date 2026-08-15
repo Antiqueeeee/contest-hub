@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Phone, Mail, MapPin, Clock, ShieldCheck, UserRound } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { api } from '@/api/client'
+import { sanitizeHtml } from '@/lib/sanitize'
 
 interface ContactPerson {
   name: string
@@ -36,7 +37,9 @@ function parseContactContent(raw: string): { info?: ContactInfo; legacyHtml?: st
   if (!raw) return {}
   try {
     const data = JSON.parse(raw)
+    // 合法 JSON 但形状不符：回退默认内容，而不是把原始 JSON 文本渲染给访客
     if (data && Array.isArray(data.contacts)) return { info: data as ContactInfo }
+    return {}
   } catch { /* 旧版富文本内容 */ }
   return { legacyHtml: raw }
 }
@@ -77,7 +80,7 @@ export default function ContactPage() {
   if (legacyHtml) {
     return (
       <div className="max-w-3xl mx-auto py-8">
-        <div className="prose prose-sm max-w-none leading-relaxed" dangerouslySetInnerHTML={{ __html: legacyHtml }} />
+        <div className="prose prose-sm max-w-none leading-relaxed" dangerouslySetInnerHTML={{ __html: sanitizeHtml(legacyHtml) }} />
       </div>
     )
   }
@@ -138,7 +141,7 @@ export default function ContactPage() {
           <Card className="rounded-xl border-amber-200 bg-amber-50/60 dark:border-amber-900 dark:bg-amber-950/30">
             <CardContent className="p-5">
               <h2 className="text-base font-semibold mb-2 text-amber-800 dark:text-amber-400">咨询提示</h2>
-              <div className="prose prose-sm max-w-none leading-relaxed" dangerouslySetInnerHTML={{ __html: info.tips }} />
+              <div className="prose prose-sm max-w-none leading-relaxed" dangerouslySetInnerHTML={{ __html: sanitizeHtml(info.tips) }} />
             </CardContent>
           </Card>
         </section>

@@ -11,6 +11,10 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     token = credentials.credentials
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        # 选手 token 与管理端同用 app secret 签发，必须拒绝选手 token 冒充管理员
+        # （选手 token payload 含 "type": "contestant"，管理员 token 无该字段）
+        if payload.get("type") == "contestant":
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="无效的认证令牌")
         user_id_str = payload.get("sub")
         if not user_id_str:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="无效的认证令牌")

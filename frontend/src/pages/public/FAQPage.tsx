@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { CircleHelp } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { api } from '@/api/client'
+import { sanitizeHtml } from '@/lib/sanitize'
 
 interface FaqItem {
   question: string
@@ -28,7 +29,9 @@ function parseFaqContent(raw: string): { info?: FaqInfo; legacyHtml?: string } {
   if (!raw) return {}
   try {
     const data = JSON.parse(raw)
+    // 合法 JSON 但形状不符：回退默认内容，而不是把原始 JSON 文本渲染给访客
     if (data && Array.isArray(data.items)) return { info: data as FaqInfo }
+    return {}
   } catch { /* 旧版富文本内容 */ }
   return { legacyHtml: raw }
 }
@@ -50,7 +53,7 @@ export default function FAQPage() {
   if (legacyHtml) {
     return (
       <div className="max-w-3xl mx-auto py-8">
-        <div className="prose prose-sm max-w-none leading-relaxed" dangerouslySetInnerHTML={{ __html: legacyHtml }} />
+        <div className="prose prose-sm max-w-none leading-relaxed" dangerouslySetInnerHTML={{ __html: sanitizeHtml(legacyHtml) }} />
       </div>
     )
   }

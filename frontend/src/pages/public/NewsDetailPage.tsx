@@ -4,6 +4,7 @@ import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ArrowLeft } from 'lucide-react'
+import { sanitizeHtml } from '@/lib/sanitize'
 
 interface NewsItem { id: number; title: string; content: string; category_id: number; category_name: string; published_at: string | null }
 
@@ -28,7 +29,7 @@ export default function NewsDetailPage() {
         <Badge variant="outline" className="mb-3">{news.category_name || '未分类'}</Badge>
         <h1 className="text-2xl font-bold mb-2">{news.title}</h1>
         <p className="text-sm text-muted-foreground mb-6">{news.published_at?.split('T')[0]}</p>
-        <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: news.content }} />
+        <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: sanitizeHtml(news.content) }} />
       </article>
     </div>
   )

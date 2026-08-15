@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '@/api/client'
+import { sanitizeHtml } from '@/lib/sanitize'
 
 const DEFAULT = `<h1>关于我们</h1>
 <p>本平台致力于为参赛选手和主办方提供高效、便捷的赛事服务。</p>
@@ -26,7 +27,7 @@ export default function AboutPage() {
 
   return (
     <div className="max-w-4xl mx-auto py-8">
-      <div className="prose prose-sm max-w-none leading-relaxed" dangerouslySetInnerHTML={{ __html: content }} />
+      <div className="prose prose-sm max-w-none leading-relaxed" dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) }} />
     </div>
   )
 }

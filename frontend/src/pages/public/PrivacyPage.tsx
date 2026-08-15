@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '@/api/client'
+import { sanitizeHtml } from '@/lib/sanitize'
 
 const DEFAULT = `<h1>隐私政策</h1>
 <p>本隐私政策说明河北省青少年数字素养提升技能竞赛（以下简称「本平台」）在您使用平台服务过程中如何收集、使用、保存和保护您的个人信息。请您在使用本平台前仔细阅读本政策。</p>
@@ -63,7 +64,7 @@ export default function PrivacyPage() {
 
   return (
     <div className="max-w-4xl mx-auto py-8">
-      <div className="prose prose-sm max-w-none leading-relaxed" dangerouslySetInnerHTML={{ __html: html }} />
+      <div className="prose prose-sm max-w-none leading-relaxed" dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }} />
     </div>
   )
 }
