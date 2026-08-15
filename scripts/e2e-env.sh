@@ -8,11 +8,12 @@ export DB_HOST=localhost DB_PORT=55433 DB_USER=contest DB_PASSWORD=test123 DB_NA
 # e2e 用例集会在 60 秒窗口内真实触发登录/报名限流阈值，放宽 10 倍（生产不设置）
 export RATE_LIMIT_MULTIPLIER=10
 export JWT_SECRET=e2e-jwt-secret-not-for-production
-export ENCRYPTION_KEY="${E2E_ENCRYPTION_KEY:-$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")}"
 export ALLOWED_ORIGINS=http://localhost:4173
 
 case "${1:-start}" in
 start)
+  # 密钥只在启动后端时需要；放在 start 分支避免 stop 也依赖 python 环境里的 cryptography
+  export ENCRYPTION_KEY="${E2E_ENCRYPTION_KEY:-$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")}"
   docker rm -f contest-e2e-pg >/dev/null 2>&1 || true
   docker run -d --name contest-e2e-pg -e POSTGRES_USER=contest -e POSTGRES_PASSWORD=test123 \
     -e POSTGRES_DB=contest_hub_e2e -p 55433:5432 postgres:17-alpine >/dev/null
