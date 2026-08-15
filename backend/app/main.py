@@ -19,6 +19,7 @@ from app.api.contestant import router as contestant_router
 from app.api.site_content import admin_router as site_content_admin, public_router as site_content_public
 from app.api.groups import router as groups_router
 from app.api.upload import router as upload_router
+from app.api.upload_blur import router as upload_blur_router
 from app.api.carousel import admin_router as carousel_admin_router, public_router as carousel_public_router
 from app.api.settings import admin_router as settings_admin_router, public_router as settings_public_router
 
@@ -116,6 +117,7 @@ app.include_router(groups_router)
 
 # Upload
 app.include_router(upload_router)
+app.include_router(upload_blur_router)
 
 # Carousel
 app.include_router(carousel_admin_router)

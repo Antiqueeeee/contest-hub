@@ -25,6 +25,25 @@ interface ApiOptions {
   body?: unknown
 }
 
+// 1x1 透明 PNG（后端上传校验要求真实图片：magic bytes + MIME + Pillow verify）
+const TINY_PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+
+/** 上传固件图片（multipart，后端校验要求真实 PNG），返回 { url }。 */
+export async function uploadImage(token: string, fileName = `e2e-upload-${Date.now()}.png`): Promise<{ url: string }> {
+  const binary = atob(TINY_PNG_BASE64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  const formData = new FormData()
+  formData.append('file', new File([bytes], fileName, { type: 'image/png' }))
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const res = await fetch(`${API}/admin/upload`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData })
+    if (res.status === 429) { await new Promise(r => setTimeout(r, 8000)); continue }
+    if (!res.ok) throw new Error(`POST /admin/upload -> ${res.status}: ${await res.text()}`)
+    return res.json()
+  }
+  throw new Error('POST /admin/upload -> 持续 429，重试耗尽')
+}
+
 /** 数据固件专用 API 客户端（仅限 setup，不代替浏览器测试动作）。429 时退避重试。 */
 export async function apiFetch<T = any>(path: string, opts: ApiOptions = {}): Promise<T> {
   const { method = 'GET', token, body } = opts

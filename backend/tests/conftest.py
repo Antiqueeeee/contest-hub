@@ -25,6 +25,7 @@ os.environ.setdefault("DB_PASSWORD", "test123")
 os.environ.setdefault("DB_NAME", "contest_hub_test")
 os.environ.setdefault("JWT_SECRET", "test-jwt-secret-for-pytest-only")
 os.environ.setdefault("EXPORT_DIR", tempfile.mkdtemp(prefix="contest-test-exports-"))
+os.environ.setdefault("UPLOAD_DIR", tempfile.mkdtemp(prefix="contest-test-uploads-"))
 
 from cryptography.fernet import Fernet  # noqa: E402
 

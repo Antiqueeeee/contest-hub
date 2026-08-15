@@ -65,6 +65,12 @@ def _delete_image_file(image_url: str) -> None:
         file_path.unlink(missing_ok=True)
     except Exception:
         pass
+    # 同步清理渐进加载的模糊占位图缓存（upload_dir/.blur/），不留孤儿文件
+    blur_path = Path(settings.upload_dir) / ".blur" / f"{filename}.jpg"
+    try:
+        blur_path.unlink(missing_ok=True)
+    except Exception:
+        pass
 
 
 # ── Admin ──────────────────────────────────────────────

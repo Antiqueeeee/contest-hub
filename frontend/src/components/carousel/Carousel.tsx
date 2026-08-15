@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { resolveUploadSrc, resolveBlurSrc } from '@/api/client'
 
 export interface CarouselSlide {
   id: number
@@ -16,6 +17,64 @@ interface CarouselProps {
   autoplay?: boolean
   interval?: number
   className?: string
+}
+
+// 单张轮播图：模糊占位图先显示，原图下载完成后 cross-fade 淡入（渐进加载）
+function Slide({ slide, height, eager }: { slide: CarouselSlide; height: number; eager: boolean }) {
+  const [loaded, setLoaded] = useState(false)     // 原图加载完成，触发淡入
+  const [failed, setFailed] = useState(false)     // 原图加载失败：只留占位图/底色
+  const [blurFailed, setBlurFailed] = useState(false)
+  const fullRef = useRef<HTMLImageElement>(null)
+
+  // 原图在挂载前已从缓存完成加载时不会再触发 onLoad，挂载后兜底检查
+  useEffect(() => {
+    const img = fullRef.current
+    if (img && img.complete && img.naturalWidth > 0) setLoaded(true)
+  }, [])
+
+  const loading = eager ? 'eager' : 'lazy'
+  const alt = slide.title || `轮播图 ${slide.id}`
+  const blurSrc = resolveBlurSrc(slide.image_url)
+
+  const content = (
+    <>
+      {blurSrc && !blurFailed && (
+        <img
+          src={blurSrc}
+          alt=""
+          aria-hidden="true"
+          loading={loading}
+          onError={() => setBlurFailed(true)}
+          className="absolute inset-0 h-full w-full object-cover scale-105 blur-sm"
+        />
+      )}
+      {!failed && (
+        <img
+          ref={fullRef}
+          src={resolveUploadSrc(slide.image_url)}
+          alt={alt}
+          loading={loading}
+          onLoad={() => setLoaded(true)}
+          onError={() => setFailed(true)}
+          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+        />
+      )}
+      {/* Gradient overlay for text readability */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+    </>
+  )
+
+  // 尺寸类统一落在最外层（a/div 共用），保证 flex 轨道 translateX 计算不受影响
+  const wrapperClass = 'block w-full flex-shrink-0 relative overflow-hidden bg-muted'
+  const wrapperStyle = { height: `${height}px` }
+
+  return slide.link_url ? (
+    <a href={slide.link_url} rel="noopener noreferrer" className={wrapperClass} style={wrapperStyle}>
+      {content}
+    </a>
+  ) : (
+    <div className={wrapperClass} style={wrapperStyle}>{content}</div>
+  )
 }
 
 export default function Carousel({ slides, height = 400, autoplay = true, interval = 5000, className = '' }: CarouselProps) {
@@ -69,39 +128,9 @@ export default function Carousel({ slides, height = 400, autoplay = true, interv
         className="flex transition-transform duration-500 ease-in-out"
         style={{ transform: `translateX(-${current * 100}%)` }}
       >
-        {slides.map((slide) => {
-          const inner = (
-            <div
-              key={slide.id}
-              className="w-full flex-shrink-0 relative"
-              style={{ height: `${height}px` }}
-            >
-              <img
-                src={slide.image_url}
-                alt={slide.title || `轮播图 ${slide.id}`}
-                className="w-full h-full object-cover"
-                loading={current === 0 ? 'eager' : 'lazy'}
-              />
-              {/* Gradient overlay for text readability */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
-            </div>
-          )
-
-          if (slide.link_url) {
-            return (
-              <a
-                key={slide.id}
-                href={slide.link_url}
-                rel="noopener noreferrer"
-                className="w-full flex-shrink-0 block"
-                style={{ height: `${height}px` }}
-              >
-                {inner.props.children}
-              </a>
-            )
-          }
-          return inner
-        })}
+        {slides.map((slide) => (
+          <Slide key={slide.id} slide={slide} height={height} eager={current === 0} />
+        ))}
       </div>
 
       {/* Left Arrow */}

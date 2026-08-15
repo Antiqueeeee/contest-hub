@@ -1,5 +1,21 @@
 export const BASE_URL = import.meta.env.VITE_API_BASE || '/api'
 
+/** 解析上传图片原图地址：BASE_URL 为绝对地址（e2e）时，相对 /uploads/ 需补 API origin，
+ *  否则前端页面上相对路径会 404。 */
+export function resolveUploadSrc(url: string): string {
+  if (url.startsWith('/uploads/') && /^https?:\/\//.test(BASE_URL)) {
+    return new URL(url, BASE_URL).href
+  }
+  return url
+}
+
+/** 模糊占位图地址：仅后端上传的图片（/uploads/ 开头）有占位图；外链返回 null。 */
+export function resolveBlurSrc(url: string): string | null {
+  if (!url.startsWith('/uploads/')) return null
+  const name = url.slice('/uploads/'.length)
+  return `${BASE_URL}/public/uploads-blur/${name}`
+}
+
 function getToken(): string | null {
   return sessionStorage.getItem('contest_hub_token')
 }
