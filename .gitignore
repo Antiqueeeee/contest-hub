@@ -41,4 +41,7 @@ docker-images/docker-compose-linux-*
 *.log
 exports/
 backups/
-frontend/test-results/
+test-results/
+
+# 运行时上传目录（本地开发测试残留；线上为 docker 卷）
+backend/uploads/
