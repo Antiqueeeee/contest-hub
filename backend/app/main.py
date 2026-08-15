@@ -50,7 +50,7 @@ async def lifespan(app: FastAPI):
         await cleanup_task
 
 
-app = FastAPI(title="竞赛信息发布平台", version="1.0.0", lifespan=lifespan, docs_url=None)
+app = FastAPI(title="河北省青少年数字素养提升技能竞赛", version="1.0.0", lifespan=lifespan, docs_url=None)
 
 app.add_middleware(
     CORSMiddleware,

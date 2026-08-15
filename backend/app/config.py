@@ -4,7 +4,7 @@ from urllib.parse import quote_plus
 
 
 class Settings(BaseSettings):
-    app_name: str = "竞赛信息发布平台"
+    app_name: str = "河北省青少年数字素养提升技能竞赛"
     debug: bool = True
 
     # Database (URL-encode password so special chars like @#! won't break parsing)

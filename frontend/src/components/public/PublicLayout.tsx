@@ -34,7 +34,7 @@ export function PublicLayout() {
             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
               <Trophy className="h-4 w-4 text-primary-foreground" />
             </div>
-            <span className="hidden sm:inline">竞赛信息发布平台</span>
+            <span className="hidden sm:inline text-base md:text-lg">河北省青少年数字素养提升技能竞赛</span>
           </Link>
 
           {/* Desktop nav */}
@@ -100,7 +100,7 @@ export function PublicLayout() {
 
       <footer className="border-t bg-card mt-16">
         <div className="max-w-6xl mx-auto px-6 py-10 text-center text-sm text-muted-foreground">
-          © 2026 竞赛信息发布平台
+          © 2026 河北省青少年数字素养提升技能竞赛
           <span className="mx-2">·</span>
           <Link to="/privacy" className="hover:text-foreground hover:underline">隐私政策</Link>
         </div>
