@@ -1,4 +1,4 @@
-# 竞赛信息发布平台
+# 河北省青少年数字素养提升技能竞赛平台
 
 轻量级竞赛信息发布与管理平台，支持赛事宣传、在线报名、成绩发布与数据导出。
 
@@ -157,7 +157,7 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/contest.example.com/privkey.pem;
 
     location / {
-        proxy_pass http://127.0.0.1:80;
+        proxy_pass http://127.0.0.1:8080;   # 与 .env 的 PORT 保持一致（见下方注意）
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
