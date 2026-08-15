@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import RichTextEditor from '@/components/editor/RichTextEditor'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -47,6 +48,31 @@ function parseContactContent(raw: string): ContactInfo {
     if (data && Array.isArray(data.contacts)) return { ...EMPTY_CONTACT, ...data }
   } catch { /* 旧版富文本，原样放入提示区 */ }
   return { ...EMPTY_CONTACT, tips: raw }
+}
+
+interface FaqItem {
+  question: string
+  answer: string
+}
+
+interface FaqInfo {
+  intro: string
+  items: FaqItem[]
+}
+
+const EMPTY_FAQ: FaqInfo = {
+  intro: '',
+  items: [{ question: '', answer: '' }],
+}
+
+/** 旧版 FAQ 是整段富文本 HTML，无法放进纯文本答案框；返回 legacy 标记由页面显示提示横幅。 */
+function parseFaqContent(raw: string): { info: FaqInfo; legacy: boolean } {
+  if (!raw) return { info: EMPTY_FAQ, legacy: false }
+  try {
+    const data = JSON.parse(raw)
+    if (data && Array.isArray(data.items)) return { info: { ...EMPTY_FAQ, ...data }, legacy: false }
+  } catch { /* 旧版富文本内容 */ }
+  return { info: EMPTY_FAQ, legacy: true }
 }
 
 function ContactForm({ value, onChange }: { value: ContactInfo; onChange: (v: ContactInfo) => void }) {
@@ -110,18 +136,58 @@ function ContactForm({ value, onChange }: { value: ContactInfo; onChange: (v: Co
   )
 }
 
+function FaqForm({ value, onChange }: { value: FaqInfo; onChange: (v: FaqInfo) => void }) {
+  const setField = <K extends keyof FaqInfo>(key: K, v: FaqInfo[K]) => onChange({ ...value, [key]: v })
+
+  return (
+    <div className="space-y-6">
+      <div className="space-y-1.5">
+        <Label>页面导语</Label>
+        <Input value={value.intro} onChange={e => setField('intro', e.target.value)} placeholder="显示在问题列表上方的一句话介绍" />
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Label>常见问题</Label>
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setField('items', [...value.items, { question: '', answer: '' }])}>
+            <Plus className="h-4 w-4" /> 添加问题
+          </Button>
+        </div>
+        {value.items.map((it, i) => (
+          <div key={i} className="rounded-lg border p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <Input value={it.question} onChange={e => { const next = [...value.items]; next[i] = { ...it, question: e.target.value }; setField('items', next) }} placeholder="问题（如：如何报名参赛？）" className="flex-1" />
+              <Button variant="ghost" size="icon" className="text-destructive shrink-0" disabled={value.items.length <= 1} onClick={() => setField('items', value.items.filter((_, j) => j !== i))} title="删除">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+            <Textarea value={it.answer} rows={3} onChange={e => { const next = [...value.items]; next[i] = { ...it, answer: e.target.value }; setField('items', next) }} placeholder="解答内容（纯文本，支持换行）" />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function SiteContentPage() {
   const [pageKey, setPageKey] = useState('about')
   const [content, setContent] = useState('')
   const [contactInfo, setContactInfo] = useState<ContactInfo>(EMPTY_CONTACT)
+  const [faqInfo, setFaqInfo] = useState<FaqInfo>(EMPTY_FAQ)
+  const [faqLegacy, setFaqLegacy] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     setLoading(true)
+    setFaqLegacy(false)
     api.get<{ content: string }>(`/admin/site-content/${pageKey}`).then(r => {
       if (pageKey === 'contact') {
         setContactInfo(parseContactContent(r.content))
+      } else if (pageKey === 'faq') {
+        const p = parseFaqContent(r.content)
+        setFaqInfo(p.info)
+        setFaqLegacy(p.legacy)
       } else {
         setContent(r.content || '')
       }
@@ -131,7 +197,9 @@ export default function SiteContentPage() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      const body = pageKey === 'contact' ? { content: JSON.stringify(contactInfo) } : { content }
+      const body = pageKey === 'contact' ? { content: JSON.stringify(contactInfo) }
+        : pageKey === 'faq' ? { content: JSON.stringify(faqInfo) }
+        : { content }
       await api.put(`/admin/site-content/${pageKey}`, body)
       alert('保存成功，前台页面已更新')
     } catch (e) {
@@ -160,6 +228,15 @@ export default function SiteContentPage() {
             <p className="text-sm text-muted-foreground py-8 text-center">加载中...</p>
           ) : pageKey === 'contact' ? (
             <ContactForm value={contactInfo} onChange={setContactInfo} />
+          ) : pageKey === 'faq' ? (
+            <div className="space-y-4">
+              {faqLegacy && (
+                <div className="p-3 rounded-lg border border-amber-200 bg-amber-50/60 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30">
+                  检测到旧版富文本内容：保存前请先复制需要保留的内容，重新整理为问答形式。保存后将覆盖旧内容，旧样式不再展示。
+                </div>
+              )}
+              <FaqForm value={faqInfo} onChange={setFaqInfo} />
+            </div>
           ) : (
             <RichTextEditor
               value={content}

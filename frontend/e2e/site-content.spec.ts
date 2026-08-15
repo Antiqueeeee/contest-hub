@@ -49,4 +49,25 @@ test.describe('站点内容页排版', () => {
     await expect(h2).toBeVisible()
     expect(await h2.evaluate(el => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThan(18)
   })
+
+  test('S3: 后台保存「常见问题」结构化内容后，前台渲染问答卡片且答案保留换行', async ({ page }) => {
+    // 与 SiteContentPage 保存逻辑一致：faq 页存结构化 JSON（intro + items），答案纯文本
+    await apiFetch('/admin/site-content/faq', {
+      method: 'PUT',
+      token: await adminToken(),
+      body: {
+        content: JSON.stringify({
+          intro: '测试导语',
+          items: [{ question: '如何报名？', answer: '第一行说明。\n第二行说明。' }],
+        }),
+      },
+    })
+    await page.goto('/faq')
+    await expect(page.getByText('测试导语')).toBeVisible()
+    await expect(page.getByText('如何报名？')).toBeVisible()
+    const answer = page.getByText(/第一行说明/)
+    await expect(answer).toBeVisible()
+    // 答案纯文本保留换行（white-space: pre-line 生效）
+    expect(await answer.evaluate(el => getComputedStyle(el).whiteSpace)).toBe('pre-line')
+  })
 })
