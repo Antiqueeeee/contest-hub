@@ -109,7 +109,7 @@ export default function AdminSettingsPage() {
             <Label className="cursor-pointer">启用未成年人保护</Label>
             <Switch checked={minorEnabled} onCheckedChange={handleToggleMinor} disabled={minorSaving} />
           </div>
-          {minorMsg && <p className={`text-sm ${minorMsg.includes('保存成功') ? 'text-green-600' : 'text-destructive'}`}>{minorMsg}</p>}
+          {minorMsg && <p className={`text-sm ${minorMsg.includes('设置已保存') ? 'text-green-600' : 'text-destructive'}`}>{minorMsg}</p>}
           {minorEnabled && (
             <p className="text-xs text-muted-foreground">已启用：若赛事面向 14 周岁以下选手，请务必在赛事管理中标记「面向未成年人」，否则平台不会收集监护人同意（责任在赛事主办方）。</p>
           )}
@@ -128,7 +128,7 @@ export default function AdminSettingsPage() {
             <Label className="cursor-pointer">开放注册</Label>
             <Switch checked={regEnabled} onCheckedChange={handleToggleReg} disabled={regSaving} />
           </div>
-          {regMsg && <p className={`text-sm ${regMsg.includes('保存成功') ? 'text-green-600' : 'text-destructive'}`}>{regMsg}</p>}
+          {regMsg && <p className={`text-sm ${regMsg.includes('设置已保存') ? 'text-green-600' : 'text-destructive'}`}>{regMsg}</p>}
         </CardContent>
       </Card>
     </div>
