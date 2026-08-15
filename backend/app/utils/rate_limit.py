@@ -7,7 +7,7 @@ sufficient for the single-worker deployment this project targets.
 import os
 import time
 from collections import defaultdict, deque
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 
 from fastapi import HTTPException, Request
 
@@ -20,14 +20,23 @@ _buckets: dict[str, deque[float]] = defaultdict(deque)
 RATE_LIMIT_MULTIPLIER = max(1, int(os.environ.get("RATE_LIMIT_MULTIPLIER", "1")))
 
 
-def rate_limit(scope: str, max_requests: int, window_seconds: int) -> Callable:
+def rate_limit(scope: str, max_requests: int, window_seconds: int,
+               key_builder: Callable[[Request], Awaitable[str]] | None = None) -> Callable:
     """Build a FastAPI dependency that rejects requests exceeding the limit.
 
-    The limit is applied per client IP within the given scope.
+    The limit is applied per client IP within the given scope. 提供 key_builder
+    时把其返回值附加到桶键上（如按报名编号分桶），避免 NAT/反向代理共享 IP
+    下所有用户共用一个桶。
     """
 
     async def dependency(request: Request) -> None:
-        key = f"{scope}:{get_client_ip(request)}"
+        suffix = ""
+        if key_builder is not None:
+            try:
+                suffix = f":{await key_builder(request)}"
+            except Exception:
+                suffix = ":anon"
+        key = f"{scope}:{get_client_ip(request)}{suffix}"
         now = time.monotonic()
         bucket = _buckets[key]
         while bucket and now - bucket[0] > window_seconds:

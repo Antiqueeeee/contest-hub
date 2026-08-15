@@ -5,6 +5,7 @@
 公开无鉴权——占位图只是已公开原图的低分辨率副本。
 """
 
+import asyncio
 import os
 import re
 import tempfile
@@ -56,7 +57,8 @@ async def get_blur(filename: str):
     if not original.is_file():
         raise HTTPException(404, "图片不存在")
     try:
-        _generate_blur(original, cache_path)
+        # Pillow 解码/缩放是 CPU 密集操作，放线程池避免阻塞事件循环（单 worker 部署）
+        await asyncio.to_thread(_generate_blur, original, cache_path)
     except Exception:
         # 原图损坏/异常尺寸（DecompressionBomb 等）一律按不存在处理，不缓存
         raise HTTPException(404, "图片不存在")

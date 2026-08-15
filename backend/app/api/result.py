@@ -10,6 +10,7 @@ from app.middleware.auth import get_current_user
 from app.schemas.result import ResultCreate, ResultOut, ResultQueryRequest, ResultFilter
 from app.services import result_service
 from app.utils.audit import log_event
+from app.utils.rate_limit import rate_limit
 
 admin_router = APIRouter(prefix="/api/admin/results", tags=["成绩管理"])
 public_router = APIRouter(prefix="/api/public/contests", tags=["前台成绩"])
@@ -262,7 +263,23 @@ async def withdraw_result(result_id: int, request: Request, db: AsyncSession = D
 
 # --- Public ---
 
-@public_router.post("/{contest_id}/query-result")
+
+async def _query_result_key(request: Request) -> str:
+    """按报名编号分桶：NAT/反向代理共享 IP 时不同选手不共用限流桶。
+    星标路由中 request.body() 由 Starlette 缓存，端点参数解析不受影响。"""
+    import json
+    try:
+        body = await request.body()
+        data = json.loads(body or b"{}")
+        reg = str(data.get("registration_number", "")).strip()
+        return reg[:64] if reg else "anon"
+    except Exception:
+        return "anon"
+
+
+@public_router.post("/{contest_id}/query-result",
+                    dependencies=[Depends(rate_limit("public_query_result", max_requests=10, window_seconds=60,
+                                                     key_builder=_query_result_key))])
 async def query_result(contest_id: int, data: ResultQueryRequest, db: AsyncSession = Depends(get_db)):
     result = await result_service.query_result_public(db, contest_id, data.registration_number, data.email)
     if not result:

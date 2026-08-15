@@ -4,6 +4,11 @@ import { uniqueEmail, DEFAULT_PASSWORD, checkboxRoot, setRegistrationEnabled } f
 // 对应 docs/bdd/01-选手注册与登录.feature
 
 test.describe('选手注册', () => {
+  // 兜底保证注册开关为开（R5 若被硬中断可能留下关闭状态，连锁影响依赖注册的其他 spec）
+  test.beforeAll(async () => {
+    await setRegistrationEnabled(true)
+  })
+
   test('R1: 注册页不收集身份证号，隐私政策勾选默认未勾且带链接', async ({ page }) => {
     await page.goto('/register')
     // 无身份证号输入框

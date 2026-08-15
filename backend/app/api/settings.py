@@ -17,7 +17,8 @@ class SettingsUpdate(BaseModel):
     values: dict[str, int]
 
 
-class MinorProtectionUpdate(BaseModel):
+class BoolSwitchUpdate(BaseModel):
+    """通用布尔开关请求体（未成年人保护/注册开关等）。"""
     enabled: bool
 
 
@@ -48,7 +49,7 @@ async def get_minor_protection(db: AsyncSession = Depends(get_db),
 
 
 @admin_router.put("/minor-protection")
-async def update_minor_protection(data: MinorProtectionUpdate, request: Request,
+async def update_minor_protection(data: BoolSwitchUpdate, request: Request,
                                   db: AsyncSession = Depends(get_db),
                                   current_user: dict = Depends(get_current_user)):
     row = (await db.execute(
@@ -82,7 +83,7 @@ async def get_registration(db: AsyncSession = Depends(get_db),
 
 
 @admin_router.put("/registration")
-async def update_registration(data: MinorProtectionUpdate, request: Request,
+async def update_registration(data: BoolSwitchUpdate, request: Request,
                               db: AsyncSession = Depends(get_db),
                               current_user: dict = Depends(get_current_user)):
     row = (await db.execute(

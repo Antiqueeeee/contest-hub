@@ -167,3 +167,96 @@ def test_generate_blur_unit():
             assert min(img.size) == 24
         # 无临时文件残留（只有 src.png 和 out.jpg）
         assert sorted(p.name for p in Path(tmp).iterdir()) == ["out.jpg", "src.png"]
+
+
+def test_filename_regex_unit():
+    """FILENAME_RE 直接单测：路径穿越与非法扩展名必须被拒（HTTP 层测试会被
+    httpx 的 URL 归一化抢先处理，恒真）。"""
+    from app.api.upload_blur import FILENAME_RE
+
+    assert FILENAME_RE.match("0123456789abcdef0123456789abcdef.png")
+    assert FILENAME_RE.match("0123456789abcdef0123456789abcdef.webp")
+    for bad in [
+        "../etc/passwd",
+        "..%2fetc%2fpasswd",
+        "foo.jpg",
+        "0123456789abcdef0123456789abcdef.gif",   # 动图排除
+        "0123456789abcdef0123456789abcdef.svg",
+        "0123456789ABCDEF0123456789ABCDEF.PNG",   # 大写不符（upload.py 一律小写化）
+        "0123456789abcdef0123456789abcdefpng",    # 缺扩展名分隔点
+        "0123456789abcdef0123456789abcdef.png/../x",
+    ]:
+        assert not FILENAME_RE.match(bad), f"{bad} 应被拒绝"
+
+
+async def test_decompression_bomb_returns_404():
+    """超大尺寸 PNG（超 Pillow MAX_IMAGE_PIXELS）→ 404 且不写缓存。"""
+    import struct
+    import zlib
+
+    import httpx
+
+    from app.database import engine
+    from app.main import app
+
+    name = _valid_name()
+    # 手工构造 IHDR 40000x40000 的 PNG（约 16 亿像素，远超默认上限 1.79 亿）
+    def chunk(tag: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
+    ihdr = struct.pack(">IIBBBBB", 40000, 40000, 8, 0, 0, 0, 0)
+    png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr) + chunk(b"IEND", b"")
+    _write_bad(name, png)
+
+    await engine.dispose()
+    try:
+        transport = ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            r = await client.get(f"/api/public/uploads-blur/{name}")
+        assert r.status_code == 404
+        assert not os.path.exists(os.path.join(UPLOAD_DIR, ".blur", f"{name}.jpg"))
+    finally:
+        await engine.dispose()
+
+
+async def test_concurrent_first_generation():
+    """两个并发首访同时生成缓存：都成功且缓存文件完整（原子替换防半成品）。"""
+    import asyncio
+
+    import httpx
+
+    from app.database import engine
+    from app.main import app
+
+    name = _valid_name()
+    _write_original(name)
+
+    await engine.dispose()
+    try:
+        transport = ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            r1, r2 = await asyncio.gather(
+                client.get(f"/api/public/uploads-blur/{name}"),
+                client.get(f"/api/public/uploads-blur/{name}"),
+            )
+        assert r1.status_code == 200 and r2.status_code == 200
+        from PIL import Image
+        with Image.open(os.path.join(UPLOAD_DIR, ".blur", f"{name}.jpg")) as img:
+            assert img.format == "JPEG"
+    finally:
+        await engine.dispose()
+
+
+def test_delete_image_file_clears_blur_cache():
+    """轮播图删除时同步清理 .blur 缓存（carousel.py 新增逻辑）。"""
+    from app.api.carousel import _delete_image_file
+    from app.api.upload_blur import _generate_blur
+    from pathlib import Path
+
+    name = _valid_name()
+    _write_original(name)
+    _generate_blur(Path(UPLOAD_DIR) / name, Path(UPLOAD_DIR) / ".blur" / f"{name}.jpg")
+    assert os.path.isfile(os.path.join(UPLOAD_DIR, ".blur", f"{name}.jpg"))
+
+    _delete_image_file(f"/uploads/{name}")
+    assert not os.path.exists(os.path.join(UPLOAD_DIR, name))
+    assert not os.path.exists(os.path.join(UPLOAD_DIR, ".blur", f"{name}.jpg"))

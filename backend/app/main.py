@@ -126,7 +126,19 @@ app.include_router(carousel_public_router)
 # Static files: serve uploaded images
 _upload_dir = Path(get_settings().upload_dir)
 _upload_dir.mkdir(parents=True, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=str(_upload_dir)), name="uploads")
+
+
+class _UploadStaticFiles(StaticFiles):
+    """上传目录静态服务：隐藏 .blur 占位图缓存子目录（仅经公开接口访问）。"""
+
+    def lookup_path(self, path: str):
+        for part in Path(path).parts:
+            if part == ".blur":
+                return None
+        return super().lookup_path(path)
+
+
+app.mount("/uploads", _UploadStaticFiles(directory=str(_upload_dir)), name="uploads")
 
 
 @app.get("/api/health")

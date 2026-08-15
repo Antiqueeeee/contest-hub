@@ -27,6 +27,12 @@ test.describe('首页轮播图渐进加载', () => {
       })
       slideId = slide.id
 
+      // 延迟原图响应，制造"占位图已显示、原图未加载"的中间态（该特性存在的慢网场景）
+      await page.route(/\/uploads\//, async (route) => {
+        await new Promise(r => setTimeout(r, 1500))
+        await route.continue()
+      })
+
       await page.goto('/')
       await expect(page.locator('[aria-roledescription="carousel"]')).toBeVisible()
 
@@ -38,6 +44,9 @@ test.describe('首页轮播图渐进加载', () => {
       const blurImg = page.locator(`[aria-roledescription="carousel"] img[aria-hidden="true"]`)
       await expect(blurImg).toHaveAttribute('src', /\/public\/uploads-blur\//)
       await expect.poll(async () => blurImg.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0)
+
+      // 中间态：原图被路由延迟未加载，此刻必须仍为透明（占位图可见）
+      await expect(fullImg).toHaveCSS('opacity', '0')
 
       // 淡入完成：原图 opacity 过渡到 1
       await expect(fullImg).toHaveCSS('opacity', '1')

@@ -58,3 +58,34 @@ async def test_register_blocked_when_disabled(db):
             assert r.status_code == 200
     finally:
         await engine.dispose()
+
+
+async def test_registration_switch_endpoint_roundtrip(db):
+    """PUT /api/admin/settings/registration 接口级往返（管理员 token）。"""
+    import httpx
+    from httpx import ASGITransport
+
+    from app.database import engine
+    from app.main import app
+    from app.models.user import User
+    from app.services.auth_service import create_access_token, hash_password
+
+    admin = User(username="reg_switch_admin", password_hash=hash_password("Admin123!"), name="管理员", phone="")
+    db.add(admin)
+    await db.commit()
+    await db.refresh(admin)
+    token = create_access_token(admin.id, admin.username)
+
+    await engine.dispose()
+    try:
+        transport = ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            headers = {"Authorization": f"Bearer {token}"}
+            r = await client.put("/api/admin/settings/registration", json={"enabled": False}, headers=headers)
+            assert r.status_code == 200 and r.json()["enabled"] is False
+            r2 = await client.get("/api/public/settings/registration")
+            assert r2.json()["enabled"] is False
+            r3 = await client.put("/api/admin/settings/registration", json={"enabled": True}, headers=headers)
+            assert r3.json()["enabled"] is True
+    finally:
+        await engine.dispose()
