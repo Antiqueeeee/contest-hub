@@ -1,6 +1,6 @@
 import os
 import uuid
-import imghdr
+import io
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, Request
@@ -12,6 +12,28 @@ router = APIRouter(prefix="/api/admin/upload", tags=["文件上传"])
 
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+
+
+def _detect_image_format(header: bytes) -> str | None:
+    """Detect image format from magic bytes (imghdr was removed in Python 3.13)."""
+    try:
+        from PIL import Image
+        with Image.open(io.BytesIO(header)) as img:
+            fmt = img.format
+        if fmt:
+            return fmt.lower()
+    except Exception:
+        pass
+
+    if header.startswith(b"\xff\xd8\xff"):
+        return "jpeg"
+    if header.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png"
+    if header[:6] in (b"GIF87a", b"GIF89a"):
+        return "gif"
+    if len(header) >= 12 and header[:4] == b"RIFF" and header[8:12] == b"WEBP":
+        return "webp"
+    return None
 
 
 def _validate_image(file: UploadFile) -> None:
@@ -31,7 +53,7 @@ def _validate_image(file: UploadFile) -> None:
     # 3. Read first 2KB to check magic bytes
     header = file.file.read(2048)
     file.file.seek(0)
-    detected = imghdr.what(None, h=header)
+    detected = _detect_image_format(header)
     if detected is None:
         raise HTTPException(400, "无法识别图片格式，请上传有效的图片文件")
     if f"image/{detected}" not in ALLOWED_MIME_TYPES:
