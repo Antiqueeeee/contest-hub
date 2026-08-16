@@ -32,6 +32,9 @@ Thumbs.db
 .env.local
 .env.*.local
 
+# 本地开发便利脚本（个人工作流，不进仓库；团队环境用 scripts/e2e-env.sh）
+run_backend.sh
+
 # Docker
 .docker/
 docker-images/*.tar
