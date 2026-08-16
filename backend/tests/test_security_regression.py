@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy import select
 
 from app.models.contest import Contest, ContestStatus
 from app.models.user import User
@@ -83,3 +84,44 @@ def test_export_cell_formula_escaping():
     assert _safe_cell_value("正常文本") == "正常文本"
     assert _safe_cell_value(None) == ""
     assert _safe_cell_value(123) == "123"
+    # 数值类型不转义：负数成绩保持数值单元格（复查发现 LOW）
+    assert _safe_cell_value(-5) == "-5"
+    assert _safe_cell_value(3.5) == "3.5"
+
+
+async def test_result_template_name_formula_escaped(db):
+    """复查修复：成绩导入模板中的姓名同样转义公式前缀（vuln-0001 补漏路径）。"""
+    import io as _io
+
+    import httpx
+    from httpx import ASGITransport
+    from openpyxl import load_workbook
+
+    from app.database import engine
+    from app.main import app
+    from app.models.registration import Registration
+
+    c = await _make_open_contest(db)
+    reg = Registration(contest_id=c.id, group_id=None,
+                       registration_number="C001-20260816-0001",
+                       form_data={"name": "=2+3", "email": "t@test.com"})
+    db.add(reg)
+    await db.commit()
+
+    from app.models.user import User
+    from app.services.auth_service import create_access_token
+    admin = (await db.execute(select(User).where(User.username == "sec_admin"))).scalar_one()
+    token = create_access_token(admin.id, admin.username)
+
+    await engine.dispose()
+    try:
+        transport = ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            r = await client.get(f"/api/admin/results/template?contest_id={c.id}",
+                                 headers={"Authorization": f"Bearer {token}"})
+            assert r.status_code == 200
+            wb = load_workbook(_io.BytesIO(r.content))
+            ws = wb.active
+            assert ws.cell(row=2, column=2).value == "'=2+3"
+    finally:
+        await engine.dispose()

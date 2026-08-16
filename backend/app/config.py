@@ -46,6 +46,11 @@ class Settings(BaseSettings):
     # 仅在站点已配置 HTTPS 后开启，依赖外层代理正确传递 X-Forwarded-Proto。
     force_https: bool = False
 
+    # 成绩查询 per-IP 聚合限流（防枚举，vuln-0024）。有外层 HTTPS 网关时
+    # 所有用户共享外层代理 IP，此桶退化为全站限额——需按拓扑调大
+    # （如 300-600），枚举防护由按报名编号分桶继续兜底。
+    public_query_ip_limit: int = 30
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

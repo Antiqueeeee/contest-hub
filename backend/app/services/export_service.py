@@ -38,7 +38,13 @@ _FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
 
 
 def _safe_cell_value(val) -> str:
-    """Neutralize spreadsheet formula/DDE injection in exported cells."""
+    """Neutralize spreadsheet formula/DDE injection in exported cells.
+
+    数值类型直接按数值写入（负数成绩不应被误转义成文本单元格），
+    仅对字符串做公式/DDE 前缀转义。
+    """
+    if isinstance(val, (int, float)) and not isinstance(val, bool):
+        return str(val)
     text = str(val) if val is not None else ""
     if text and text[0] in _FORMULA_PREFIXES:
         return "'" + text
@@ -131,7 +137,7 @@ def _write_registration_rows(
             elif name == "organization":
                 val = form_data.get("organization", "")
             elif name == "group_id":
-                val = str(reg.group_id) if reg.group_id else ""
+                val = reg.group_id if reg.group_id else ""
             elif name == "submitted_at":
                 val = reg.submitted_at.strftime("%Y-%m-%d %H:%M") if reg.submitted_at else ""
             else:
@@ -175,16 +181,16 @@ async def _write_result_rows(
             elif name == "organization":
                 val = form_data.get("organization", "")
             elif name == "total_score":
-                val = str(r.total_score)
+                val = r.total_score
             elif name == "rank":
-                val = str(r.rank) if r.rank else ""
+                val = r.rank if r.rank else ""
             elif name == "award":
                 val = ""
             elif name in MINOR_FORM_FIELD_MASKERS:
                 # 未成年人字段（form_data 内密文）解密+脱敏
                 val = _export_form_value(form_data, name)
             else:
-                val = str(r.scores.get(name, "")) if r.scores else ""
+                val = r.scores.get(name, "") if r.scores else ""
             cell = ws.cell(row=row_idx, column=col_idx, value=_safe_cell_value(val))
             cell.font = body_font
             cell.border = thin_border

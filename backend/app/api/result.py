@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from openpyxl import load_workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
+from app.config import get_settings
 from app.database import get_db
 from app.middleware.auth import get_current_user
 from app.schemas.result import ResultCreate, ResultOut, ResultQueryRequest, ResultFilter
@@ -84,10 +85,12 @@ async def download_template(
         cell.fill = header_fill
         cell.font = header_font
 
-    # Pre-fill registration numbers and names
+    # Pre-fill registration numbers and names（name 为用户可控数据，
+    # 与导出服务一致做公式/DDE 注入转义，vuln-0001）
+    from app.services.export_service import _safe_cell_value
     for row_idx, reg in enumerate(registrations, 2):
         ws.cell(row=row_idx, column=1, value=reg.registration_number)
-        ws.cell(row=row_idx, column=2, value=reg.form_data.get("name", ""))
+        ws.cell(row=row_idx, column=2, value=_safe_cell_value(reg.form_data.get("name", "")))
 
     from datetime import datetime, timezone
     safe_title = contest.title.replace('/', '_').replace('\\', '_') if contest else f"赛事{contest_id}"
@@ -279,9 +282,12 @@ async def _query_result_key(request: Request) -> str:
 
 @public_router.post("/{contest_id}/query-result",
                     dependencies=[
-                        # 聚合桶：同一 IP 的全局上限，防止轮换报名编号绕过按编号分桶（vuln-0024）。
-                        # 上限宽松，正常选手/NAT 共享出口场景不受影响。
-                        Depends(rate_limit("public_query_result_ip", max_requests=30, window_seconds=60)),
+                        # 聚合桶：同一客户端 IP 的全局上限，防止轮换报名编号绕过按编号分桶（vuln-0024）。
+                        # 上限可配（PUBLIC_QUERY_IP_LIMIT）：有外层网关时所有用户共享外层代理 IP，
+                        # 该桶退化为全站限额，需按拓扑调大（见 config.py 注释）。
+                        Depends(rate_limit("public_query_result_ip",
+                                           max_requests=get_settings().public_query_ip_limit,
+                                           window_seconds=60)),
                         # 按报名编号分桶：NAT/反向代理共享 IP 时不同选手不共用限流桶
                         Depends(rate_limit("public_query_result", max_requests=10, window_seconds=60,
                                            key_builder=_query_result_key)),

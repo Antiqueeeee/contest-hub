@@ -82,13 +82,23 @@ async def register(db: AsyncSession, data: RegistrationCreate, contestant_id: in
         if parse_birth_date(birth_date) > datetime.now(timezone.utc).date():
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                                 detail="出生日期不能晚于今天")
-        # 交叉校验：18 位身份证号第 7-14 位编码出生日期，必须与填写的出生日期
+        # 交叉校验：18 位身份证号第 7-14 位编码出生日期，必须与使用的出生日期
         # 一致，防止未成年人通过虚报生日绕过监护人同意分支（vuln-0023）。
         if len(id_number or "") == 18:
             id_birth = f"{id_number[6:10]}-{id_number[10:12]}-{id_number[12:14]}"
             if id_birth != birth_date:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                                    detail="出生日期与身份证号不一致，请核对后重新提交")
+                if contestant_row is not None:
+                    # 账号绑定生日与证号不一致（如个人中心更正证号、存量数据）：
+                    # 以校验位合法的证号为权威来源自动更正，避免永久锁死报名。
+                    # 证号是更强的凭据；更正只会让年龄分支更准确，不会放宽保护。
+                    birth_date = id_birth
+                    contestant_row.birth_date = id_birth
+                    if parse_birth_date(birth_date) > datetime.now(timezone.utc).date():
+                        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                            detail="出生日期不能晚于今天")
+                else:
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                        detail="出生日期与身份证号不一致，请核对后重新提交")
         # 资格判定以赛事开始日为准（不是报名日），存生日不存年龄
         age = age_at_str(birth_date, contest.start_date.date() if contest.start_date else datetime.now(timezone.utc).date())
         if age is None:

@@ -147,6 +147,30 @@ async def test_birth_date_must_match_id_number(db):
     assert decrypt_value(reg.form_data["birth_date"]) == "2015-09-30"
 
 
+async def test_account_birth_auto_corrected_to_match_id(db):
+    """复查修复：账号绑定生日与证号不一致时以证号为准自动更正，不锁死报名。
+
+    复现场景：个人中心更正证号后，账号生日仍是旧值；再次报名必须成功
+    且账号生日被更正为新证号内嵌日期（而不是永久 400）。
+    """
+    await _enable_minor_protection(db)
+    c1 = await _make_contest(db, minor_policy="minors_welcome")
+    c2 = await _make_contest(db, minor_policy="minors_welcome")
+    cid = await _register_contestant(db)
+    # 首次报名：生日 2010-05-05 + 内嵌一致的证号绑定
+    await _register(db, c1, birth_date="2010-05-05", minor_statement_agreed=True,
+                    contestant_id=cid, id_number=make_id_number("2010-05-05"))
+    # 模拟个人中心更正证号：新证号内嵌 2005-05-05，账号生日仍是旧值
+    row = (await db.execute(select(Contestant).where(Contestant.id == cid))).scalar_one()
+    row.id_number = make_id_number("2005-05-05")
+    await db.commit()
+    # 再次报名不提交出生日期 → 以证号为准自动更正，报名成功
+    reg = await _register(db, c2, contestant_id=cid)
+    assert reg.contestant_id == cid
+    row = (await db.execute(select(Contestant).where(Contestant.id == cid))).scalar_one()
+    assert row.birth_date == "2005-05-05"
+
+
 # ── @M1 系统开关关闭：流程与常规完全一致 ─────────────────────────
 
 

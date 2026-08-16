@@ -378,7 +378,7 @@ Environment="DB_PORT=5432"
 Environment="DB_USER=contest"
 Environment="DB_PASSWORD=contest123"
 Environment="DB_NAME=contest_hub"
-Environment="JWT_SECRET=your-secret-here"
+Environment="JWT_SECRET=<至少32字节随机值：python -c "import secrets; print(secrets.token_urlsafe(32))">"
 Environment="ENCRYPTION_KEY=your-fernet-key-here"
 Environment="ALLOWED_ORIGINS=http://your-domain.com"
 ExecStart=/opt/contest-hub/backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --proxy-headers

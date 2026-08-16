@@ -31,8 +31,11 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     if not user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="无效的认证令牌")
     # 每次请求回查用户表：账号被禁用/删除后，未过期 token 立即失效。
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    if user is None or user.status != UserStatus.active:
+    # 只取认证所需三列，避免加载加密 phone 列（每请求解密开销/密钥不匹配时 500）。
+    result = await db.execute(
+        select(User.id, User.username, User.status).where(User.id == user_id)
+    )
+    row = result.first()
+    if row is None or row.status != UserStatus.active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="无效的认证令牌")
-    return {"user_id": user.id, "username": user.username}
+    return {"user_id": row.id, "username": row.username}
