@@ -7,7 +7,7 @@ from fastapi import HTTPException, status
 from app.models.contest import Contest, ContestGroup, ContestStatus, MinorPolicy
 from app.models.contestant import Contestant
 from app.models.registration import Registration
-from app.schemas.registration import RegistrationCreate, RegistrationOut
+from app.schemas.registration import RegistrationCreate, RegistrationOut, RESERVED_FORM_FIELDS
 from app.services.settings_service import get_minor_protection_enabled
 from app.utils.timezone import to_aware
 from app.utils.crypto import encrypt_value, decrypt_value, mask_id_number
@@ -82,6 +82,13 @@ async def register(db: AsyncSession, data: RegistrationCreate, contestant_id: in
         if parse_birth_date(birth_date) > datetime.now(timezone.utc).date():
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                                 detail="出生日期不能晚于今天")
+        # 交叉校验：18 位身份证号第 7-14 位编码出生日期，必须与填写的出生日期
+        # 一致，防止未成年人通过虚报生日绕过监护人同意分支（vuln-0023）。
+        if len(id_number or "") == 18:
+            id_birth = f"{id_number[6:10]}-{id_number[10:12]}-{id_number[12:14]}"
+            if id_birth != birth_date:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                    detail="出生日期与身份证号不一致，请核对后重新提交")
         # 资格判定以赛事开始日为准（不是报名日），存生日不存年龄
         age = age_at_str(birth_date, contest.start_date.date() if contest.start_date else datetime.now(timezone.utc).date())
         if age is None:
@@ -201,8 +208,13 @@ async def register(db: AsyncSession, data: RegistrationCreate, contestant_id: in
                 form_data["guardian_contact"] = encrypt_value(data.guardian_contact or "")
     if data.organization:
         form_data["organization"] = data.organization
-    # Custom fields are stored as-is (caller is responsible for not putting PII in them)
-    form_data.update(data.custom_fields)
+    # 自定义字段剥离保留键（schema 已过滤，此处兜底）：防止明文覆写加密 PII
+    # 或篡改 name/email/organization，从而绕过去重与名额控制（vuln-0022）。
+    safe_custom_fields = {
+        key: value for key, value in (data.custom_fields or {}).items()
+        if key not in RESERVED_FORM_FIELDS
+    }
+    form_data.update(safe_custom_fields)
 
     reg = None
     for _attempt in range(3):

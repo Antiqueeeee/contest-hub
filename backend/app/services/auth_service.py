@@ -22,7 +22,9 @@ def verify_password(plain: str, hashed: str) -> bool:
 def create_access_token(user_id: int, username: str) -> str:
     settings = get_settings()
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expire_minutes)
-    payload = {"sub": str(user_id), "username": username, "exp": expire}
+    # type: "admin" 与选手 token 的 type: "contestant" 区分命名空间，
+    # 中间件仅接受显式 admin 类型的 token（见 middleware/auth.py）。
+    payload = {"sub": str(user_id), "username": username, "type": "admin", "exp": expire}
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 

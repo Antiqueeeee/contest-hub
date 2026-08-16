@@ -23,7 +23,7 @@ os.environ.setdefault("DB_PORT", "55433")
 os.environ.setdefault("DB_USER", "contest")
 os.environ.setdefault("DB_PASSWORD", "test123")
 os.environ.setdefault("DB_NAME", "contest_hub_test")
-os.environ.setdefault("JWT_SECRET", "test-jwt-secret-for-pytest-only")
+os.environ.setdefault("JWT_SECRET", "test-jwt-secret-for-pytest-only-2026")
 os.environ.setdefault("EXPORT_DIR", tempfile.mkdtemp(prefix="contest-test-exports-"))
 os.environ.setdefault("UPLOAD_DIR", tempfile.mkdtemp(prefix="contest-test-uploads-"))
 
@@ -82,3 +82,15 @@ async def contest(db):
 
 VALID_ID_A = "110101199003077758"
 VALID_ID_B = "320102199505124329"
+
+
+def make_id_number(birth_date: str, seq: int = 1) -> str:
+    """Generate a valid-checksum 18-digit ID whose embedded birth date matches.
+
+    后端新增出生日期与身份证号交叉校验后，未成年人测试数据必须一致。
+    """
+    weights = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
+    codes = "10X98765432"
+    id17 = f"110101{birth_date.replace('-', '')}{seq:03d}"
+    total = sum(int(d) * w for d, w in zip(id17, weights))
+    return id17 + codes[total % 11]

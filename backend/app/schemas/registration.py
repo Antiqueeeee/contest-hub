@@ -4,6 +4,14 @@ from app.utils.crypto import decrypt_value, mask_id_number
 from app.utils.minor import mask_birth_date, mask_name, mask_contact
 from app.utils.validators import validate_id_number
 
+# form_data 保留键：custom_fields 不允许覆写这些键，防止明文覆盖加密 PII
+# 或篡改 name/email/organization 从而绕过去重与名额控制（vuln-0022）。
+# schema 校验层剥离 + registration_service 合并处兜底，双保险。
+RESERVED_FORM_FIELDS = frozenset({
+    "name", "email", "id_number", "birth_date",
+    "guardian_name", "guardian_contact", "organization",
+})
+
 
 class RegistrationCreate(BaseModel):
     contest_id: int
@@ -42,6 +50,14 @@ class RegistrationCreate(BaseModel):
         if not v:
             raise ValueError("请先阅读并同意《隐私政策》")
         return v
+
+    @field_validator("custom_fields")
+    @classmethod
+    def strip_reserved_keys(cls, v: dict[str, str]) -> dict[str, str]:
+        """剥离保留键：客户端提交的 custom_fields 不得覆盖权威字段/加密 PII。"""
+        if not v:
+            return {}
+        return {key: value for key, value in v.items() if key not in RESERVED_FORM_FIELDS}
 
 
 class RegistrationOut(BaseModel):

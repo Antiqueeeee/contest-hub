@@ -19,7 +19,7 @@ from app.services import consent_service, contestant_service, registration_servi
 from app.utils.crypto import decrypt_value
 from app.utils.minor import age_at, age_at_str, requirement_for_age, mask_birth_date, parse_birth_date
 
-from .conftest import VALID_ID_A, VALID_ID_B
+from .conftest import VALID_ID_A, make_id_number
 
 
 # ── 工具函数 ─────────────────────────────────────────────────────
@@ -65,7 +65,11 @@ async def _make_contest(db, *, minor_policy: str = "normal", start_date=None, en
 
 async def _register(db, contest, *, birth_date=None, guardian_name=None, guardian_contact=None,
                     guardian_agreed=False, minor_statement_agreed=False, contestant_id=None,
-                    email="a@test.com", id_number=VALID_ID_A):
+                    email="a@test.com", id_number=None):
+    # 未显式指定身份证号时，按出生日期生成内嵌一致的合法号码
+    # （出生日期与身份证号交叉校验自 2026-08 起强制一致）
+    if id_number is None:
+        id_number = make_id_number(birth_date) if birth_date else VALID_ID_A
     return await registration_service.register(db, RegistrationCreate(
         contest_id=contest.id, name="测试选手", email=email, id_number=id_number,
         id_number_agreed=True, privacy_agreed=True,
@@ -121,6 +125,26 @@ async def test_future_birth_date_rejected(db):
     with pytest.raises(HTTPException) as exc:
         await _register(db, c, birth_date=future)
     assert "不能晚于今天" in exc.value.detail
+
+
+async def test_birth_date_must_match_id_number(db):
+    """vuln-0023 回归：自报出生日期必须与身份证号内嵌日期一致。
+
+    身份证号内嵌 2015-09-30（<14 周岁），却自报成人出生日期 → 400；
+    一致时按未成年人分支正常要求监护人同意。
+    """
+    await _enable_minor_protection(db)
+    c = await _make_contest(db, minor_policy="minors_welcome")
+    child_id = "110101201509302342"  # 内嵌出生日期 2015-09-30，校验位有效
+    with pytest.raises(HTTPException) as exc:
+        await _register(db, c, birth_date="1980-01-01", id_number=child_id)
+    assert "出生日期与身份证号不一致" in exc.value.detail
+
+    reg = await _register(db, c, birth_date="2015-09-30", id_number=child_id,
+                          guardian_name="王家长", guardian_contact="13800000000",
+                          guardian_agreed=True)
+    assert reg.contestant_id is None
+    assert decrypt_value(reg.form_data["birth_date"]) == "2015-09-30"
 
 
 # ── @M1 系统开关关闭：流程与常规完全一致 ─────────────────────────
@@ -284,11 +308,11 @@ async def test_withdraw_then_reregister_recollects(db):
         await _register(db, c2, contestant_id=cid)
     assert "请填写出生日期" in exc.value.detail
 
-    # 重新收集后再次绑定
-    await _register(db, c2, birth_date="2016-06-06", guardian_name="李家长",
+    # 重新收集后再次绑定（身份证号已绑定账号、内嵌生日固定，重新申报须一致）
+    await _register(db, c2, birth_date="2016-05-05", guardian_name="李家长",
                     guardian_contact="13900000000", guardian_agreed=True, contestant_id=cid)
     row = (await db.execute(select(Contestant).where(Contestant.id == cid))).scalar_one()
-    assert row.birth_date == "2016-06-06"
+    assert row.birth_date == "2016-05-05"
     assert row.guardian_name == "李家长"
 
 
@@ -320,7 +344,7 @@ async def test_minor_requirement_endpoint(db):
         # 已绑定生日：16 岁 → statement；10 岁 → guardian
         cid16 = await _register_contestant(db, "s16@test.com")
         await _register(db, minor_c, birth_date="2010-05-05", minor_statement_agreed=True,
-                        contestant_id=cid16, id_number=VALID_ID_B, email="s16@test.com")
+                        contestant_id=cid16, email="s16@test.com")
         r = await client.get(f"/api/public/contests/{minor_c.id}/minor-requirement",
                              headers={"Authorization": f"Bearer {create_contestant_token(cid16)}"})
         assert r.json() == {"active": True, "requirement": "statement"}
@@ -328,7 +352,7 @@ async def test_minor_requirement_endpoint(db):
         cid10 = await _register_contestant(db, "s10@test.com")
         await _register(db, minor_c, birth_date="2016-05-05", guardian_name="张家长",
                         guardian_contact="13800000000", guardian_agreed=True,
-                        contestant_id=cid10, id_number=VALID_ID_A, email="s10@test.com")
+                        contestant_id=cid10, email="s10@test.com")
         r = await client.get(f"/api/public/contests/{minor_c.id}/minor-requirement",
                              headers={"Authorization": f"Bearer {create_contestant_token(cid10)}"})
         assert r.json() == {"active": True, "requirement": "guardian"}
@@ -376,7 +400,7 @@ async def test_serialization_masks_minor_fields(db):
     # 账号报名（无 form_data 副本）→ 从账号注入脱敏出生日期
     cid = await _register_contestant(db)
     reg2 = await _register(db, c, birth_date="2011-05-05", minor_statement_agreed=True,
-                           contestant_id=cid, id_number=VALID_ID_B)
+                           contestant_id=cid)
     out2 = await rs.serialize_registration(db, reg2)
     assert out2["form_data"]["birth_date"] == "2011-**-**"
     # 个人中心 my-data 同样脱敏

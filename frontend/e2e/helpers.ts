@@ -6,6 +6,16 @@ export const VALID_ID_A = '110101199003077758'
 export const VALID_ID_B = '320102199505124329'
 export const DEFAULT_PASSWORD = 'Passw0rd!'
 
+/** 生成与出生日期内嵌一致、校验位合法的 18 位身份证号。
+ *  后端自 2026-08 起强制出生日期与身份证号一致（未成年人保护交叉校验）。 */
+export function validIdForBirthDate(birthDate: string): string {
+  const weights = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
+  const codes = '10X98765432'
+  const id17 = `110101${birthDate.replaceAll('-', '')}${String(Math.floor(Math.random() * 900) + 100)}`
+  const total = [...id17].reduce((sum, d, i) => sum + Number(d) * weights[i], 0)
+  return id17 + codes[total % 11]
+}
+
 export function uniqueEmail(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@test.com`
 }

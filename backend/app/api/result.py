@@ -278,8 +278,14 @@ async def _query_result_key(request: Request) -> str:
 
 
 @public_router.post("/{contest_id}/query-result",
-                    dependencies=[Depends(rate_limit("public_query_result", max_requests=10, window_seconds=60,
-                                                     key_builder=_query_result_key))])
+                    dependencies=[
+                        # 聚合桶：同一 IP 的全局上限，防止轮换报名编号绕过按编号分桶（vuln-0024）。
+                        # 上限宽松，正常选手/NAT 共享出口场景不受影响。
+                        Depends(rate_limit("public_query_result_ip", max_requests=30, window_seconds=60)),
+                        # 按报名编号分桶：NAT/反向代理共享 IP 时不同选手不共用限流桶
+                        Depends(rate_limit("public_query_result", max_requests=10, window_seconds=60,
+                                           key_builder=_query_result_key)),
+                    ])
 async def query_result(contest_id: int, data: ResultQueryRequest, db: AsyncSession = Depends(get_db)):
     result = await result_service.query_result_public(db, contest_id, data.registration_number, data.email)
     if not result:

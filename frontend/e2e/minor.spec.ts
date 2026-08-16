@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import {
   uniqueEmail, createContest, createMinorContest, enableMinorProtection,
   apiRegisterContestant, apiRegisterForContest, loginContestant,
-  checkboxRoot, VALID_ID_A,
+  checkboxRoot, validIdForBirthDate,
 } from './helpers'
 
 // 对应 docs/bdd/07-未成年人保护.feature（@M1/M2/M3/M4/M10 的浏览器流程）
@@ -40,14 +40,15 @@ test.describe('未成年人保护（可选启用）', () => {
 
     // 出现出生日期输入与提示
     await expect(page.getByText('本赛事面向未成年人，报名需确认年龄')).toBeVisible()
-    await page.locator('input[type="date"]').fill(birthYearsAgo(10))
+    const birthDate = birthYearsAgo(10)
+    await page.locator('input[type="date"]').fill(birthDate)
     await expect(page.getByText('监护人姓名')).toBeVisible()
     await expect(page.getByText('14 周岁以下选手需监护人同意')).toBeVisible()
 
     // 未勾选监护人同意提交 → 前端拦截
     await page.getByPlaceholder('请输入真实姓名').fill('小选手')
     await page.getByPlaceholder('请输入邮箱地址').fill(uniqueEmail('m4'))
-    await page.getByPlaceholder('18位身份证号码').fill(VALID_ID_A)
+    await page.getByPlaceholder('18位身份证号码').fill(validIdForBirthDate(birthDate))
     await checkboxRoot(page, 'idNumberAgreed').click()
     await checkboxRoot(page, 'privacy').click()
     await page.getByRole('button', { name: '提交报名' }).click()
@@ -67,13 +68,14 @@ test.describe('未成年人保护（可选启用）', () => {
     const c = await createMinorContest(`M3赛事${Date.now()}`)
     await page.goto(`/contests/${c.id}/register`)
 
-    await page.locator('input[type="date"]').fill(birthYearsAgo(16))
+    const birthDate = birthYearsAgo(16)
+    await page.locator('input[type="date"]').fill(birthDate)
     await expect(page.getByText('我确认本人已满 14 周岁')).toBeVisible()
 
     // 未勾选声明提交 → 前端拦截
     await page.getByPlaceholder('请输入真实姓名').fill('少年选手')
     await page.getByPlaceholder('请输入邮箱地址').fill(uniqueEmail('m3'))
-    await page.getByPlaceholder('18位身份证号码').fill(VALID_ID_A)
+    await page.getByPlaceholder('18位身份证号码').fill(validIdForBirthDate(birthDate))
     await checkboxRoot(page, 'idNumberAgreed').click()
     await checkboxRoot(page, 'privacy').click()
     await page.getByRole('button', { name: '提交报名' }).click()
@@ -98,9 +100,10 @@ test.describe('未成年人保护（可选启用）', () => {
     const email = uniqueEmail('m8')
     const { token } = await apiRegisterContestant(email, '绑定选手')
     const c1 = await createMinorContest(`M8赛事1${Date.now()}`)
+    const birthDate = birthYearsAgo(16)
     await apiRegisterForContest(c1.id, {
-      name: '绑定选手', email, idNumber: VALID_ID_A, token,
-      birthDate: birthYearsAgo(16), minorStatementAgreed: true,
+      name: '绑定选手', email, idNumber: validIdForBirthDate(birthDate), token,
+      birthDate, minorStatementAgreed: true,
     })
     const c2 = await createMinorContest(`M8赛事2${Date.now()}`)
 

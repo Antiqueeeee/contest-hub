@@ -31,6 +31,19 @@ def _export_form_value(form_data: dict, name: str) -> str:
         return masker(decrypt_value(raw))
     return raw or ""
 
+
+# 表格公式/DDE 注入前缀（CWE-1236）：这些字符开头的单元格会被表格软件
+# 当作公式或 DDE 命令执行。导出前统一加单引号前缀使其按文本处理。
+_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _safe_cell_value(val) -> str:
+    """Neutralize spreadsheet formula/DDE injection in exported cells."""
+    text = str(val) if val is not None else ""
+    if text and text[0] in _FORMULA_PREFIXES:
+        return "'" + text
+    return text
+
 # Chinese field name mapping
 FIELD_LABELS = {
     "registration_number": "报名编号",
@@ -124,7 +137,7 @@ def _write_registration_rows(
             else:
                 # 未成年人字段（form_data 内密文）解密+脱敏；自定义字段原样
                 val = _export_form_value(form_data, name)
-            cell = ws.cell(row=row_idx, column=col_idx, value=str(val) if val is not None else "")
+            cell = ws.cell(row=row_idx, column=col_idx, value=_safe_cell_value(val))
             cell.font = body_font
             cell.border = thin_border
 
@@ -172,7 +185,7 @@ async def _write_result_rows(
                 val = _export_form_value(form_data, name)
             else:
                 val = str(r.scores.get(name, "")) if r.scores else ""
-            cell = ws.cell(row=row_idx, column=col_idx, value=str(val) if val is not None else "")
+            cell = ws.cell(row=row_idx, column=col_idx, value=_safe_cell_value(val))
             cell.font = body_font
             cell.border = thin_border
 

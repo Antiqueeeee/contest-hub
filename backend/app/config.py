@@ -55,6 +55,9 @@ def get_settings() -> Settings:
     # Validate required secrets at startup so misconfiguration fails fast
     if not settings.jwt_secret:
         raise ValueError("jwt_secret 未配置，请在 .env 文件或环境变量中设置")
+    if len(settings.jwt_secret) < 32:
+        raise ValueError("jwt_secret 强度不足：请使用至少 32 字节的随机密钥，"
+                         "生成命令: python -c \"import secrets; print(secrets.token_urlsafe(32))\"")
     if not settings.encryption_key:
         raise ValueError("encryption_key 未配置，请运行以下命令生成:\n"
                          "  python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\"")

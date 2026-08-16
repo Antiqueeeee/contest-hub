@@ -60,3 +60,66 @@ async def test_admin_token_still_accepted(db):
             assert r.status_code == 200
     finally:
         await engine.dispose()
+
+
+async def test_token_without_type_rejected(db):
+    """伪造 token 回归测试：用已知密钥签发、缺失 type claim 的 token 必须被拒。
+
+    扫描器 vuln-0002 的利用方式：管理端 token 无 type 字段，中间件曾只拒绝
+    type=="contestant"。现在要求显式 type=="admin"。
+    """
+    import httpx
+    from datetime import datetime, timedelta, timezone
+    from httpx import ASGITransport
+    from jose import jwt
+
+    from app.config import get_settings
+    from app.database import engine
+    from app.main import app
+
+    settings = get_settings()
+    exp = datetime.now(timezone.utc) + timedelta(minutes=5)
+    forged = jwt.encode(
+        {"sub": "99999", "username": "admin", "exp": exp},
+        settings.jwt_secret, algorithm="HS256",
+    )
+
+    await engine.dispose()
+    try:
+        transport = ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            r = await client.get("/api/admin/users",
+                                 headers={"Authorization": f"Bearer {forged}"})
+            assert r.status_code == 401
+    finally:
+        await engine.dispose()
+
+
+async def test_disabled_admin_token_rejected(db):
+    """禁用账号回归测试：禁用后未过期 token 必须立即失效（vuln-0025）。"""
+    import httpx
+    from httpx import ASGITransport
+
+    from app.database import engine
+    from app.main import app
+    from app.models.user import User, UserStatus
+    from app.services.auth_service import create_access_token, hash_password
+
+    admin = User(username="disabled_guard", password_hash=hash_password("Admin123!"),
+                 name="管理员", phone="")
+    db.add(admin)
+    await db.commit()
+    await db.refresh(admin)
+    token = create_access_token(admin.id, admin.username)
+    admin.status = UserStatus.disabled
+    await db.commit()
+
+    await engine.dispose()
+    try:
+        transport = ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            r = await client.get("/api/admin/site-content/contact",
+                                 headers={"Authorization": f"Bearer {token}"})
+            assert r.status_code == 401
+    finally:
+        await engine.dispose()
