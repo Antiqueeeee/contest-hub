@@ -33,6 +33,7 @@ services:
       JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-120}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost}
       FORCE_HTTPS: ${FORCE_HTTPS:-false}
+      PUBLIC_QUERY_IP_LIMIT: ${PUBLIC_QUERY_IP_LIMIT:-30}
       EXPORT_DIR: /app/exports
     volumes:
       - exports:/app/exports
